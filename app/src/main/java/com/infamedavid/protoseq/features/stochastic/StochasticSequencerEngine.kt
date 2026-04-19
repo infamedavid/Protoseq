@@ -58,8 +58,15 @@ class StochasticSequencerEngine {
             null
         }
 
-        val gate = random.nextFloat() >= sanitized.bernoulliProbability
-        val trigger = gate
+        val baseGate = true
+        val baseTrigger = baseGate
+        val passesBernoulli = if (baseGate) {
+            random.nextFloat() >= sanitized.bernoulliProbability
+        } else {
+            false
+        }
+        val gate = baseGate && passesBernoulli
+        val trigger = baseTrigger && passesBernoulli
         val gateLengthTicks = if (gate) {
             calculateGateLengthTicks(sanitized.gateLength, sanitized.randomGateLength)
         } else {

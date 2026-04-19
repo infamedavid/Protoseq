@@ -151,7 +151,7 @@ class TransportViewModel(
         val output = sequencerEngine.advance(sequencerConfig)
         if (sequencerConfig.outputMode != MidiOutputMode.NOTE) return
         val note = output.note ?: return
-        if (!output.gate) return
+        if (!output.gate || !output.trigger) return
 
         midiEngine.sendNoteOn(
             channel = sequencerConfig.midiChannel,
