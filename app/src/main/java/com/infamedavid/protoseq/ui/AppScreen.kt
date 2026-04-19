@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ModuleCard
@@ -150,6 +152,38 @@ fun AppScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "MODE",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.NOTE) },
+                                    modifier = Modifier.weight(1f),
+                                    enabled = stochasticState.outputMode != MidiOutputMode.NOTE
+                                ) {
+                                    Text(text = "NOTE")
+                                }
+
+                                OutlinedButton(
+                                    onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.CC) },
+                                    modifier = Modifier.weight(1f),
+                                    enabled = stochasticState.outputMode != MidiOutputMode.CC
+                                ) {
+                                    Text(text = "CC")
+                                }
+                            }
+                        }
+
                         ProtoValueField(
                             label = "CHNL",
                             value = stochasticState.midiChannel.toString(),
@@ -173,6 +207,20 @@ fun AppScreen(
                             onDecrement = stochasticViewModel::previousQuantizationMode,
                             onIncrement = stochasticViewModel::nextQuantizationMode
                         )
+
+                        if (stochasticState.outputMode == MidiOutputMode.CC) {
+                            ProtoValueField(
+                                label = "CC#",
+                                value = stochasticState.ccNumber.toString(),
+                                modifier = Modifier.weight(1f),
+                                onDecrement = {
+                                    stochasticViewModel.setCcNumber(stochasticState.ccNumber - 1)
+                                },
+                                onIncrement = {
+                                    stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
+                                }
+                            )
+                        }
                     }
                 }
             }
