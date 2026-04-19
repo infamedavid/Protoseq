@@ -15,19 +15,21 @@ class MidiDeviceRepository(
             return outputTargets
         }
 
-        val devices = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            manager.getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM)
-        } else {
-            manager.devices
-        }
-
-        outputTargets = devices
-            .flatMap { deviceInfo ->
-                val inputPortCount = deviceInfo.inputPortCount
-                (0 until inputPortCount).map { portNumber ->
-                    MidiOutputTarget(deviceInfo = deviceInfo, inputPortNumber = portNumber)
-                }
+        val devices: List<MidiDeviceInfo> =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                manager.getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM).toList()
+            } else {
+                manager.devices.toList()
             }
+
+        outputTargets = devices.flatMap { deviceInfo: MidiDeviceInfo ->
+            (0 until deviceInfo.inputPortCount).map { portNumber: Int ->
+                MidiOutputTarget(
+                    deviceInfo = deviceInfo,
+                    inputPortNumber = portNumber
+                )
+            }
+        }
 
         return outputTargets
     }
@@ -40,6 +42,8 @@ data class MidiOutputTarget(
     val inputPortNumber: Int
 ) {
     val id: Int = deviceInfo.id
-    val name: String = deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME)
-        ?: "MIDI Device $id"
+
+    val name: String =
+        deviceInfo.properties.getString(MidiDeviceInfo.PROPERTY_NAME)
+            ?: "MIDI Device $id"
 }

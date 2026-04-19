@@ -8,30 +8,37 @@ import java.io.IOException
 class AndroidMidiMessageSender(
     private val midiManager: MidiManager
 ) : MidiMessageSender {
+
     private val lock = Any()
 
     private var currentDevice: MidiDevice? = null
     private var currentInputPort: MidiInputPort? = null
 
     override fun connect(target: MidiOutputTarget) {
-        midiManager.openDevice(target.deviceInfo) { midiDevice ->
-            synchronized(lock) {
-                closeCurrentConnectionLocked()
+        midiManager.openDevice(
+            target.deviceInfo,
+            object : MidiManager.OnDeviceOpenedListener {
+                override fun onDeviceOpened(midiDevice: MidiDevice?) {
+                    synchronized(lock) {
+                        closeCurrentConnectionLocked()
 
-                if (midiDevice == null) {
-                    return@synchronized
+                        if (midiDevice == null) {
+                            return
+                        }
+
+                        val inputPort = midiDevice.openInputPort(target.inputPortNumber)
+                        if (inputPort == null) {
+                            midiDevice.closeQuietly()
+                            return
+                        }
+
+                        currentDevice = midiDevice
+                        currentInputPort = inputPort
+                    }
                 }
-
-                val inputPort = midiDevice.openInputPort(target.inputPortNumber)
-                if (inputPort == null) {
-                    midiDevice.closeQuietly()
-                    return@synchronized
-                }
-
-                currentDevice = midiDevice
-                currentInputPort = inputPort
-            }
-        }
+            },
+            null
+        )
     }
 
     override fun disconnect() {
@@ -41,24 +48,24 @@ class AndroidMidiMessageSender(
     }
 
     override fun sendStart() {
-        sendRealTimeMessage(byteArrayOf(0xFA.toByte()))
+        sendMessage(byteArrayOf(0xFA.toByte()))
     }
 
     override fun sendStop() {
-        sendRealTimeMessage(byteArrayOf(0xFC.toByte()))
+        sendMessage(byteArrayOf(0xFC.toByte()))
     }
 
     override fun sendContinue() {
-        sendRealTimeMessage(byteArrayOf(0xFB.toByte()))
+        sendMessage(byteArrayOf(0xFB.toByte()))
     }
 
     override fun sendClock() {
-        sendRealTimeMessage(byteArrayOf(0xF8.toByte()))
+        sendMessage(byteArrayOf(0xF8.toByte()))
     }
 
     override fun sendNoteOn(channel: Int, note: Int, velocity: Int) {
-        val status = (0x90 or (channel.coerceIn(1, 16) - 1)).toByte()
-        sendRealTimeMessage(
+        val status = (0x90 or ((channel.coerceIn(1, 16)) - 1)).toByte()
+        sendMessage(
             byteArrayOf(
                 status,
                 note.coerceIn(0, 127).toByte(),
@@ -68,8 +75,8 @@ class AndroidMidiMessageSender(
     }
 
     override fun sendNoteOff(channel: Int, note: Int, velocity: Int) {
-        val status = (0x80 or (channel.coerceIn(1, 16) - 1)).toByte()
-        sendRealTimeMessage(
+        val status = (0x80 or ((channel.coerceIn(1, 16)) - 1)).toByte()
+        sendMessage(
             byteArrayOf(
                 status,
                 note.coerceIn(0, 127).toByte(),
@@ -78,7 +85,7 @@ class AndroidMidiMessageSender(
         )
     }
 
-    private fun sendRealTimeMessage(data: ByteArray) {
+    private fun sendMessage(data: ByteArray) {
         synchronized(lock) {
             val inputPort = currentInputPort ?: return
             try {
@@ -101,7 +108,7 @@ class AndroidMidiMessageSender(
         try {
             this?.close()
         } catch (_: IOException) {
-            // Ignore close failures.
+            // Ignore close failures
         }
     }
 
@@ -109,7 +116,7 @@ class AndroidMidiMessageSender(
         try {
             this?.close()
         } catch (_: IOException) {
-            // Ignore close failures.
+            // Ignore close failures
         }
     }
 }
