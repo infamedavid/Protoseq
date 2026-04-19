@@ -122,6 +122,7 @@ class TransportViewModel(
 
     fun pause() {
         if (clockEngine.getTransportState() == TransportState.Playing) {
+            sendAndClearPendingNoteOffs()
             clockEngine.pause()
         }
     }
