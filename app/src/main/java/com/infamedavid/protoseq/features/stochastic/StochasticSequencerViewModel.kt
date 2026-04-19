@@ -10,8 +10,8 @@ class StochasticSequencerViewModel : ViewModel() {
     private val _uiState = MutableStateFlow(StochasticSequencerUiState())
     val uiState: StateFlow<StochasticSequencerUiState> = _uiState.asStateFlow()
 
-    fun setLockAmount(amount: Float) {
-        _uiState.value = _uiState.value.copy(lockAmount = amount.coerceIn(0f, 1f))
+    fun setLockPosition(value: Float) {
+        _uiState.value = _uiState.value.copy(lockPosition = value.coerceIn(-1f, 1f))
     }
 
     fun setSequenceLength(length: Int) {
@@ -30,6 +30,14 @@ class StochasticSequencerViewModel : ViewModel() {
     fun decrementMidiChannel() {
         val next = if (_uiState.value.midiChannel <= 1) 16 else _uiState.value.midiChannel - 1
         setMidiChannel(next)
+    }
+
+    fun setOutputMode(mode: MidiOutputMode) {
+        _uiState.value = _uiState.value.copy(outputMode = mode)
+    }
+
+    fun setCcNumber(value: Int) {
+        _uiState.value = _uiState.value.copy(ccNumber = value.coerceIn(0, 127))
     }
 
     fun setBaseNote(note: Int) {

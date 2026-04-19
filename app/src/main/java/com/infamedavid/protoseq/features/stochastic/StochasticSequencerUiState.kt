@@ -4,9 +4,11 @@ import com.infamedavid.protoseq.core.music.QuantizationMode
 
 data class StochasticSequencerUiState(
     val sequenceLength: Int = 16,
-    val lockAmount: Float = 0.35f,
+    val lockPosition: Float = 0f,              // -1f..+1f
     val midiChannel: Int = 5,
-    val baseNote: Int = 49, // C#3
+    val outputMode: MidiOutputMode = MidiOutputMode.NOTE,
+    val ccNumber: Int = 1,
+    val baseNote: Int = 49,
     val quantizationMode: QuantizationMode = QuantizationMode.PMIN,
     val slewAmount: Float = 0.10f,
     val pitchRangeOctaves: Int = 2,
