@@ -67,4 +67,12 @@ class MidiEngine(
     fun sendClock() {
         messageSender.sendClock()
     }
+
+    fun sendNoteOn(channel: Int, note: Int, velocity: Int = 100) {
+        messageSender.sendNoteOn(channel, note, velocity)
+    }
+
+    fun sendNoteOff(channel: Int, note: Int, velocity: Int = 0) {
+        messageSender.sendNoteOff(channel, note, velocity)
+    }
 }

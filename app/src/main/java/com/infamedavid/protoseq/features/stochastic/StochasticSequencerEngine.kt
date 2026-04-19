@@ -1,6 +1,7 @@
 package com.infamedavid.protoseq.features.stochastic
 
 import com.infamedavid.protoseq.core.music.ScaleQuantizer
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -99,12 +100,9 @@ class StochasticSequencerEngine {
             .coerceIn(MIDI_MIN, MIDI_MAX)
     }
 
-    private fun calculateGateLengthTicks(gateLength: Float, randomGateLength: Float): Int {
-        val baseTicks = gateLength * TICKS_PER_STEP
-        val variationRange = randomGateLength * TICKS_PER_STEP
-        val bipolarRandom = (random.nextFloat() * 2f) - 1f
-        val randomizedTicks = baseTicks + (variationRange * bipolarRandom)
-        return randomizedTicks.roundToInt().coerceIn(1, TICKS_PER_STEP)
+    private fun calculateGateLengthTicks(gateLength: Float, _randomGateLength: Float): Int {
+        val normalizedGateLength = gateLength.coerceIn(0f, 1f)
+        return 1 + floor(normalizedGateLength * (TICKS_PER_STEP - 1).toFloat()).toInt()
     }
 
     private fun randomBit(): Int = if (random.nextBoolean()) 1 else 0
@@ -113,7 +111,7 @@ class StochasticSequencerEngine {
         private const val REGISTER_SIZE = 16
         private const val RAW_WINDOW_SIZE = 8
         private const val RAW_MAX_VALUE = 255
-        private const val TICKS_PER_STEP = 96
+        private const val TICKS_PER_STEP = 24
         private const val SEMITONES_PER_OCTAVE = 12
         private const val MIDI_MIN = 0
         private const val MIDI_MAX = 127
