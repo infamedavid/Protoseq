@@ -6,21 +6,46 @@ class MidiEngine(
 ) {
     private var selectedTarget: MidiOutputTarget? = null
 
-    fun refreshDevices() {
-        val outputTargets = midiDeviceRepository.refreshDevices()
-        if (outputTargets.isEmpty()) {
-            selectedTarget = null
-            messageSender.disconnect()
-            return
-        }
-
-        val current = selectedTarget
-        if (current == null || outputTargets.none { it.id == current.id && it.inputPortNumber == current.inputPortNumber }) {
-            selectOutputTarget(outputTargets.first())
+    fun startDeviceMonitoring(onTargetsUpdated: (List<MidiOutputTarget>, MidiOutputTarget?) -> Unit) {
+        midiDeviceRepository.startMonitoring {
+            val outputTargets = refreshDevices()
+            onTargetsUpdated(outputTargets, selectedTarget)
         }
     }
 
+    fun stopDeviceMonitoring() {
+        midiDeviceRepository.stopMonitoring()
+    }
+
+    fun refreshDevices(): List<MidiOutputTarget> {
+        val outputTargets = midiDeviceRepository.refreshDevices()
+        if (outputTargets.isEmpty()) {
+            clearSelection()
+            return outputTargets
+        }
+
+        val current = selectedTarget
+        val hasCurrent = current != null && outputTargets.any {
+            it.selectionId == current.selectionId
+        }
+
+        when {
+            hasCurrent -> Unit
+            outputTargets.size == 1 -> selectOutputTarget(outputTargets.first())
+            else -> clearSelection()
+        }
+
+        return outputTargets
+    }
+
     fun getOutputTargets(): List<MidiOutputTarget> = midiDeviceRepository.getOutputTargets()
+
+    fun getSelectedOutputTarget(): MidiOutputTarget? = selectedTarget
+
+    fun clearSelection() {
+        selectedTarget = null
+        messageSender.disconnect()
+    }
 
     fun selectOutputTarget(target: MidiOutputTarget) {
         selectedTarget = target

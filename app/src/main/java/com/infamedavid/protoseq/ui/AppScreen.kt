@@ -94,6 +94,49 @@ fun AppScreen(
                             transportViewModel.pause()
                         }
                     }
+
+                    val selectedMidiTarget = transportState.midiOutputTargets.firstOrNull {
+                        it.selectionId == transportState.selectedMidiOutputId
+                    }
+
+                    Text(
+                        text = selectedMidiTarget?.let {
+                            "MIDI OUT: ${it.name} (IN ${it.inputPortNumber + 1})"
+                        } ?: "No MIDI output selected",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    if (transportState.midiOutputTargets.isEmpty()) {
+                        Text(
+                            text = "No MIDI output targets available",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { transportViewModel.clearMidiOutputSelection() },
+                                enabled = transportState.selectedMidiOutputId != null
+                            ) {
+                                Text(text = "NONE")
+                            }
+
+                            transportState.midiOutputTargets.forEach { target ->
+                                OutlinedButton(
+                                    onClick = {
+                                        transportViewModel.selectMidiOutputTarget(target.selectionId)
+                                    },
+                                    enabled = transportState.selectedMidiOutputId != target.selectionId
+                                ) {
+                                    Text(text = "${target.name} IN${target.inputPortNumber + 1}")
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

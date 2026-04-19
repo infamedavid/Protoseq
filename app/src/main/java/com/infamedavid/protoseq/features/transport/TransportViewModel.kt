@@ -38,7 +38,12 @@ class TransportViewModel(
     val uiState: StateFlow<TransportUiState> = _uiState.asStateFlow()
 
     init {
-        midiEngine.refreshDevices()
+        midiEngine.startDeviceMonitoring { targets, selected ->
+            _uiState.value = _uiState.value.copy(
+                midiOutputTargets = targets,
+                selectedMidiOutputId = selected?.selectionId
+            )
+        }
 
         vmScope.launch {
             clockEngine.transportState.collect { state ->
@@ -59,6 +64,17 @@ class TransportViewModel(
         val clampedBpm = bpm.coerceIn(40f, 240f)
         clockEngine.setBpm(clampedBpm.toDouble())
         _uiState.value = _uiState.value.copy(bpm = clampedBpm)
+    }
+
+    fun selectMidiOutputTarget(selectionId: String) {
+        val target = midiEngine.getOutputTargets().firstOrNull { it.selectionId == selectionId } ?: return
+        midiEngine.selectOutputTarget(target)
+        _uiState.value = _uiState.value.copy(selectedMidiOutputId = target.selectionId)
+    }
+
+    fun clearMidiOutputSelection() {
+        midiEngine.clearSelection()
+        _uiState.value = _uiState.value.copy(selectedMidiOutputId = null)
     }
 
     fun play() {
@@ -96,8 +112,9 @@ class TransportViewModel(
     }
 
     override fun onCleared() {
-        super.onCleared()
+        midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
+        super.onCleared()
     }
 
     companion object {
@@ -105,9 +122,11 @@ class TransportViewModel(
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {
                 override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-                    val midiManager = appContext.getSystemService(Context.MIDI_SERVICE) as MidiManager
+                    val midiManager = appContext.getSystemService(Context.MIDI_SERVICE) as? MidiManager
+                    val messageSender =
+                        midiManager?.let { AndroidMidiMessageSender(it) } ?: NoOpMidiMessageSender()
                     val midiEngine = MidiEngine(
-                        messageSender = AndroidMidiMessageSender(midiManager),
+                        messageSender = messageSender,
                         midiDeviceRepository = MidiDeviceRepository(midiManager)
                     )
                     return TransportViewModel(
