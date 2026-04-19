@@ -1,6 +1,7 @@
 package com.infamedavid.protoseq.core.midi
 
 import android.media.midi.MidiDeviceInfo
+import android.media.midi.MidiDeviceStatus
 import android.media.midi.MidiManager
 import android.os.Build
 import android.os.Handler
@@ -28,7 +29,7 @@ class MidiDeviceRepository(
         }
 
         if (deviceCallback == null) {
-            deviceCallback = object : MidiManager.DeviceCallback() {
+            val callback = object : MidiManager.DeviceCallback() {
                 override fun onDeviceAdded(device: MidiDeviceInfo) {
                     notifyDeviceChange()
                 }
@@ -37,19 +38,21 @@ class MidiDeviceRepository(
                     notifyDeviceChange()
                 }
 
-                override fun onDeviceStatusChanged(status: android.media.midi.MidiDeviceStatus) {
+                override fun onDeviceStatusChanged(status: MidiDeviceStatus) {
                     notifyDeviceChange()
                 }
             }
+
+            deviceCallback = callback
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 manager.registerDeviceCallback(
                     MidiManager.TRANSPORT_MIDI_BYTE_STREAM,
                     callbackExecutor,
-                    deviceCallback
+                    callback
                 )
             } else {
-                manager.registerDeviceCallback(deviceCallback, callbackHandler)
+                manager.registerDeviceCallback(callback, callbackHandler)
             }
         }
 
@@ -77,8 +80,8 @@ class MidiDeviceRepository(
                 manager.devices.toList()
             }
 
-        outputTargets = devices.flatMap { deviceInfo: MidiDeviceInfo ->
-            (0 until deviceInfo.inputPortCount).map { portNumber: Int ->
+        outputTargets = devices.flatMap { deviceInfo ->
+            (0 until deviceInfo.inputPortCount).map { portNumber ->
                 MidiOutputTarget(
                     deviceInfo = deviceInfo,
                     inputPortNumber = portNumber
@@ -101,7 +104,6 @@ data class MidiOutputTarget(
     val inputPortNumber: Int
 ) {
     val id: Int = deviceInfo.id
-
     val selectionId: String = "$id:$inputPortNumber"
 
     val name: String =
