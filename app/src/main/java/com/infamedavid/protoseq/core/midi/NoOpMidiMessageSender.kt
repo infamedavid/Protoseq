@@ -1,6 +1,8 @@
 package com.infamedavid.protoseq.core.midi
 
 class NoOpMidiMessageSender : MidiMessageSender {
+    override fun connect(target: MidiOutputTarget) = Unit
+    override fun disconnect() = Unit
     override fun sendStart() = Unit
     override fun sendStop() = Unit
     override fun sendContinue() = Unit
