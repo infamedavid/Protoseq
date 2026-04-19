@@ -97,9 +97,9 @@ fun AppScreen(
                 ) {
                     ProtoDualSliderRow(
                         leftLabel = "LOCK",
-                        leftValue = stochasticState.lockAmount,
-                        leftValueText = "${(stochasticState.lockAmount * 100).toInt()}%",
-                        onLeftValueChange = stochasticViewModel::setLockAmount,
+                        leftValue = stochasticState.lockPosition,
+                        leftValueText = "${(stochasticState.lockPosition * 100).toInt()}%",
+                        onLeftValueChange = stochasticViewModel::setLockPosition,
                         rightLabel = "SQLN",
                         rightValue = (stochasticState.sequenceLength - 8) / 24f,
                         rightValueText = stochasticState.sequenceLength.toString(),
