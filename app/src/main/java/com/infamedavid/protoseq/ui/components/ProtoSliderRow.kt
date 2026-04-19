@@ -19,6 +19,7 @@ fun ProtoSliderRow(
     value: Float,
     valueText: String,
     onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -44,8 +45,9 @@ fun ProtoSliderRow(
         }
 
         Slider(
-            value = value.coerceIn(0f, 1f),
+            value = value.coerceIn(valueRange.start, valueRange.endInclusive),
             onValueChange = onValueChange,
+            valueRange = valueRange,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,

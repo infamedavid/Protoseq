@@ -12,10 +12,12 @@ fun ProtoDualSliderRow(
     leftValue: Float,
     leftValueText: String,
     onLeftValueChange: (Float) -> Unit,
+    leftValueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     rightLabel: String,
     rightValue: Float,
     rightValueText: String,
     onRightValueChange: (Float) -> Unit,
+    rightValueRange: ClosedFloatingPointRange<Float> = 0f..1f,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -27,6 +29,7 @@ fun ProtoDualSliderRow(
             value = leftValue,
             valueText = leftValueText,
             onValueChange = onLeftValueChange,
+            valueRange = leftValueRange,
             modifier = Modifier.weight(1f)
         )
 
@@ -35,6 +38,7 @@ fun ProtoDualSliderRow(
             value = rightValue,
             valueText = rightValueText,
             onValueChange = onRightValueChange,
+            valueRange = rightValueRange,
             modifier = Modifier.weight(1f)
         )
     }
