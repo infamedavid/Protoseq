@@ -100,9 +100,19 @@ class StochasticSequencerEngine {
             .coerceIn(MIDI_MIN, MIDI_MAX)
     }
 
-    private fun calculateGateLengthTicks(gateLength: Float, _randomGateLength: Float): Int {
+    private fun calculateGateLengthTicks(gateLength: Float, randomGateLength: Float): Int {
         val normalizedGateLength = gateLength.coerceIn(0f, 1f)
-        return 1 + floor(normalizedGateLength * (TICKS_PER_STEP - 1).toFloat()).toInt()
+        val baseTicks = 1 + floor(normalizedGateLength * (TICKS_PER_STEP - 1).toFloat()).toInt()
+
+        val normalizedRandomGateLength = randomGateLength.coerceIn(0f, 1f)
+        if (normalizedRandomGateLength == 0f) {
+            return baseTicks
+        }
+
+        val maxDelta = floor(normalizedRandomGateLength * (TICKS_PER_STEP - 1).toFloat()).toInt()
+        val randomDelta = random.nextInt(from = -maxDelta, until = maxDelta + 1)
+
+        return (baseTicks + randomDelta).coerceIn(1, TICKS_PER_STEP)
     }
 
     private fun randomBit(): Int = if (random.nextBoolean()) 1 else 0
