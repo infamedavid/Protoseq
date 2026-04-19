@@ -1,8 +1,13 @@
 package com.infamedavid.protoseq.features.transport
 
+import android.content.Context
+import android.media.midi.MidiManager
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.infamedavid.protoseq.core.clock.ClockEngine
 import com.infamedavid.protoseq.core.clock.TransportState
+import com.infamedavid.protoseq.core.midi.AndroidMidiMessageSender
 import com.infamedavid.protoseq.core.midi.MidiDeviceRepository
 import com.infamedavid.protoseq.core.midi.MidiEngine
 import com.infamedavid.protoseq.core.midi.NoOpMidiMessageSender
@@ -33,6 +38,8 @@ class TransportViewModel(
     val uiState: StateFlow<TransportUiState> = _uiState.asStateFlow()
 
     init {
+        midiEngine.refreshDevices()
+
         vmScope.launch {
             clockEngine.transportState.collect { state ->
                 _uiState.value = _uiState.value.copy(state = state)
@@ -91,5 +98,24 @@ class TransportViewModel(
     override fun onCleared() {
         super.onCleared()
         vmScope.cancel()
+    }
+
+    companion object {
+        fun factory(context: Context): ViewModelProvider.Factory {
+            val appContext = context.applicationContext
+            return object : ViewModelProvider.Factory {
+                override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                    val midiManager = appContext.getSystemService(Context.MIDI_SERVICE) as MidiManager
+                    val midiEngine = MidiEngine(
+                        messageSender = AndroidMidiMessageSender(midiManager),
+                        midiDeviceRepository = MidiDeviceRepository(midiManager)
+                    )
+                    return TransportViewModel(
+                        clockEngine = ClockEngine(),
+                        midiEngine = midiEngine
+                    ) as T
+                }
+            }
+        }
     }
 }

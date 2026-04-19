@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
@@ -34,9 +35,12 @@ import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
 @Composable
 fun AppScreen(
-    transportViewModel: TransportViewModel = viewModel(),
     stochasticViewModel: StochasticSequencerViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val transportViewModel: TransportViewModel = viewModel(
+        factory = TransportViewModel.factory(context)
+    )
     val transportState by transportViewModel.uiState.collectAsState()
     val stochasticState by stochasticViewModel.uiState.collectAsState()
 

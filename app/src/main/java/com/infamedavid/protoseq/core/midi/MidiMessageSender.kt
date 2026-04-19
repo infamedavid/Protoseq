@@ -1,6 +1,8 @@
 package com.infamedavid.protoseq.core.midi
 
 interface MidiMessageSender {
+    fun connect(target: MidiOutputTarget)
+    fun disconnect()
     fun sendStart()
     fun sendStop()
     fun sendContinue()
