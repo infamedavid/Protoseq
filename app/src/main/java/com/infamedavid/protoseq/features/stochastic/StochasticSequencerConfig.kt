@@ -17,9 +17,9 @@ data class StochasticSequencerConfig(
     val randomGateLength: Float,
     val bernoulliProbability: Float,
 ) {
-    fun sanitized(registerSize: Int = 32): StochasticSequencerConfig {
+    fun sanitized(registerSize: Int = 16): StochasticSequencerConfig {
         return copy(
-            sequenceLength = sequenceLength.coerceIn(8, registerSize),
+            sequenceLength = sequenceLength.coerceIn(2, registerSize),
             lockPosition = lockPosition.coerceIn(-1f, 1f),
             midiChannel = midiChannel.coerceIn(1, 16),
             ccNumber = ccNumber.coerceIn(0, 127),
