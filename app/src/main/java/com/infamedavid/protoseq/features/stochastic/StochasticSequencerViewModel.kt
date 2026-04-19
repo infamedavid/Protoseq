@@ -15,7 +15,7 @@ class StochasticSequencerViewModel : ViewModel() {
     }
 
     fun setSequenceLength(length: Int) {
-        _uiState.value = _uiState.value.copy(sequenceLength = length.coerceIn(2, 16))
+        _uiState.value = _uiState.value.copy(sequenceLength = length.coerceIn(2, 64))
     }
 
     fun setMidiChannel(channel: Int) {

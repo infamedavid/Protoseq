@@ -156,10 +156,10 @@ fun AppScreen(
                         onLeftValueChange = stochasticViewModel::setLockPosition,
                         leftValueRange = -1f..1f,
                         rightLabel = "SQLN",
-                        rightValue = (stochasticState.sequenceLength - 8) / 24f,
+                        rightValue = (stochasticState.sequenceLength - 2) / 62f,
                         rightValueText = stochasticState.sequenceLength.toString(),
                         onRightValueChange = { normalized ->
-                            stochasticViewModel.setSequenceLength((8 + normalized * 24).toInt())
+                            stochasticViewModel.setSequenceLength((2 + normalized * 62).toInt())
                         }
                     )
 

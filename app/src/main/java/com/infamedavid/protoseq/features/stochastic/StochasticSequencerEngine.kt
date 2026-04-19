@@ -125,7 +125,7 @@ class StochasticSequencerEngine {
     private fun randomBit(): Int = if (random.nextBoolean()) 1 else 0
 
     private companion object {
-        private const val REGISTER_SIZE = 16
+        private const val REGISTER_SIZE = 64
         private const val RAW_WINDOW_SIZE = 8
         private const val RAW_MAX_VALUE = 255
         private const val TICKS_PER_STEP = 24
