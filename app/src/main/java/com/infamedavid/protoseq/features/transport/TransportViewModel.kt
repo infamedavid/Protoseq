@@ -11,6 +11,11 @@ import com.infamedavid.protoseq.core.midi.AndroidMidiMessageSender
 import com.infamedavid.protoseq.core.midi.MidiDeviceRepository
 import com.infamedavid.protoseq.core.midi.MidiEngine
 import com.infamedavid.protoseq.core.midi.NoOpMidiMessageSender
+import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
+import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
+import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
+import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
+import com.infamedavid.protoseq.features.stochastic.toConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,6 +33,9 @@ class TransportViewModel(
     )
 ) : ViewModel() {
     private val vmScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val sequencerEngine = StochasticSequencerEngine()
+    private var sequencerConfig: StochasticSequencerConfig = StochasticSequencerUiState().toConfig()
+    private val scheduledNoteOffs = mutableListOf<ScheduledNoteOff>()
 
     private val _uiState = MutableStateFlow(
         TransportUiState(
@@ -53,6 +61,10 @@ class TransportViewModel(
 
         vmScope.launch {
             clockEngine.ticks.collect { tick ->
+                processDueNoteOffs(tick)
+                if (isSequencerStepTick(tick)) {
+                    advanceSequencer(tick)
+                }
                 if (tick % 4L == 0L) {
                     midiEngine.sendClock()
                 }
@@ -80,6 +92,8 @@ class TransportViewModel(
     fun play() {
         when (clockEngine.getTransportState()) {
             TransportState.Stopped -> {
+                sendAndClearPendingNoteOffs()
+                sequencerEngine.reset()
                 clockEngine.playFromStart()
                 midiEngine.sendStart()
             }
@@ -97,6 +111,7 @@ class TransportViewModel(
         when (clockEngine.getTransportState()) {
             TransportState.Playing,
             TransportState.Paused -> {
+                sendAndClearPendingNoteOffs()
                 clockEngine.stop()
                 midiEngine.sendStop()
             }
@@ -111,13 +126,60 @@ class TransportViewModel(
         }
     }
 
+    fun updateSequencerConfig(config: StochasticSequencerConfig) {
+        sequencerConfig = config.sanitized()
+    }
+
+    private fun isSequencerStepTick(tick: Long): Boolean = ((tick - 1L) % TICKS_PER_STEP) == 0L
+
+    private fun processDueNoteOffs(currentTick: Long) {
+        val iterator = scheduledNoteOffs.iterator()
+        while (iterator.hasNext()) {
+            val scheduled = iterator.next()
+            if (scheduled.dueTick == currentTick) {
+                midiEngine.sendNoteOff(
+                    channel = scheduled.channel,
+                    note = scheduled.note
+                )
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun advanceSequencer(currentTick: Long) {
+        val output = sequencerEngine.advance(sequencerConfig)
+        if (sequencerConfig.outputMode != MidiOutputMode.NOTE) return
+        val note = output.note ?: return
+        if (!output.gate) return
+
+        midiEngine.sendNoteOn(
+            channel = sequencerConfig.midiChannel,
+            note = note
+        )
+        scheduledNoteOffs += ScheduledNoteOff(
+            dueTick = currentTick + output.gateLengthTicks,
+            channel = sequencerConfig.midiChannel,
+            note = note
+        )
+    }
+
+    private fun sendAndClearPendingNoteOffs() {
+        scheduledNoteOffs.forEach { scheduled ->
+            midiEngine.sendNoteOff(channel = scheduled.channel, note = scheduled.note)
+        }
+        scheduledNoteOffs.clear()
+    }
+
     override fun onCleared() {
+        sendAndClearPendingNoteOffs()
         midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
         super.onCleared()
     }
 
     companion object {
+        private const val TICKS_PER_STEP = 24L
+
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
             return object : ViewModelProvider.Factory {
@@ -137,4 +199,10 @@ class TransportViewModel(
             }
         }
     }
+
+    private data class ScheduledNoteOff(
+        val dueTick: Long,
+        val channel: Int,
+        val note: Int
+    )
 }

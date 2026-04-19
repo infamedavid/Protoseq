@@ -17,6 +17,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
+import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ModuleCard
 import com.infamedavid.protoseq.ui.components.ProtoButton
@@ -43,6 +45,9 @@ fun AppScreen(
     )
     val transportState by transportViewModel.uiState.collectAsState()
     val stochasticState by stochasticViewModel.uiState.collectAsState()
+    LaunchedEffect(stochasticState) {
+        transportViewModel.updateSequencerConfig(stochasticState.toConfig())
+    }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
