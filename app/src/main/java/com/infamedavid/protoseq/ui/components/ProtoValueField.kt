@@ -19,8 +19,9 @@ import androidx.compose.ui.unit.dp
 fun ProtoValueField(
     label: String,
     value: String,
-    onDecrement: () -> Unit,
-    onIncrement: () -> Unit,
+    onDecrement: (() -> Unit)? = null,
+    onIncrement: (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -33,29 +34,14 @@ fun ProtoValueField(
             color = MaterialTheme.colorScheme.onSurface
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        if (onClick != null) {
             OutlinedButton(
-                onClick = onDecrement,
+                onClick = onClick,
                 modifier = Modifier
-                    .weight(0.8f)
+                    .fillMaxWidth()
                     .height(48.dp),
                 shape = ProtoControlShape,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
-            ) {
-                Text(text = "-")
-            }
-
-            Row(
-                modifier = Modifier
-                    .weight(2f)
-                    .height(48.dp)
-                    .padding(horizontal = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
             ) {
                 Text(
                     text = value,
@@ -63,16 +49,48 @@ fun ProtoValueField(
                     color = MaterialTheme.colorScheme.secondary
                 )
             }
-
-            OutlinedButton(
-                onClick = onIncrement,
-                modifier = Modifier
-                    .weight(0.8f)
-                    .height(48.dp),
-                shape = ProtoControlShape,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(text = "+")
+                OutlinedButton(
+                    onClick = requireNotNull(onDecrement),
+                    modifier = Modifier
+                        .weight(0.8f)
+                        .height(48.dp),
+                    shape = ProtoControlShape,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                ) {
+                    Text(text = "-")
+                }
+
+                Row(
+                    modifier = Modifier
+                        .weight(2f)
+                        .height(48.dp)
+                        .padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = requireNotNull(onIncrement),
+                    modifier = Modifier
+                        .weight(0.8f)
+                        .height(48.dp),
+                    shape = ProtoControlShape,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
+                ) {
+                    Text(text = "+")
+                }
             }
         }
     }
