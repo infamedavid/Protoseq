@@ -1,4 +1,12 @@
-# Project exclude paths
-/.gradle/
-/app/build/
-/build/
+local.properties
+.idea/
+.gradle/
+build/
+*/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+keystore.properties
+protoseq.zip
+art/
