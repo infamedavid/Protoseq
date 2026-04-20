@@ -6,5 +6,14 @@ enum class QuantizationMode(val displayName: String) {
     MAJR("MAJR"),
     MINR("MINR"),
     PMAJ("PMAJ"),
-    PMIN("PMIN")
+    PMIN("PMIN"),
+    DOR("DOR"),
+    PHR("PHR"),
+    LYD("LYD"),
+    MIX("MIX"),
+    BLUS("BLUS"),
+    HARM("HARM"),
+    MELM("MELM"),
+    WHOL("WHOL"),
+    DIM("DIM")
 }
