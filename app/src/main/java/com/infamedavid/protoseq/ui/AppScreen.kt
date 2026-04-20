@@ -270,7 +270,7 @@ fun AppScreen(
                                 modifier = Modifier.weight(1f),
                                 enabled = stochasticState.outputMode != MidiOutputMode.NOTE
                             ) {
-                                Text(text = "NOTE")
+                                Text(text = "N")
                             }
 
                             OutlinedButton(
@@ -278,7 +278,7 @@ fun AppScreen(
                                 modifier = Modifier.weight(1f),
                                 enabled = stochasticState.outputMode != MidiOutputMode.CC
                             ) {
-                                Text(text = "CC")
+                                Text(text = "C")
                             }
                         }
                     }
