@@ -36,6 +36,7 @@ import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
+import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
@@ -93,7 +94,8 @@ fun AppScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { transportViewModel.setBpm(transportState.bpm - 1f) }
+                        onClick = { transportViewModel.setBpm(transportState.bpm - 1f) },
+                        shape = ProtoControlShape
                     ) {
                         Text(text = "-")
                     }
@@ -112,7 +114,8 @@ fun AppScreen(
                     )
 
                     OutlinedButton(
-                        onClick = { transportViewModel.setBpm(transportState.bpm + 1f) }
+                        onClick = { transportViewModel.setBpm(transportState.bpm + 1f) },
+                        shape = ProtoControlShape
                     ) {
                         Text(text = "+")
                     }
@@ -161,7 +164,8 @@ fun AppScreen(
                     ) {
                         OutlinedButton(
                             onClick = { transportViewModel.clearMidiOutputSelection() },
-                            enabled = transportState.selectedMidiOutputId != null
+                            enabled = transportState.selectedMidiOutputId != null,
+                            shape = ProtoControlShape
                         ) {
                             Text(text = "NONE")
                         }
@@ -171,7 +175,8 @@ fun AppScreen(
                                 onClick = {
                                     transportViewModel.selectMidiOutputTarget(target.selectionId)
                                 },
-                                enabled = transportState.selectedMidiOutputId != target.selectionId
+                                enabled = transportState.selectedMidiOutputId != target.selectionId,
+                                shape = ProtoControlShape
                             ) {
                                 Text(text = midiTargetLabels[target.selectionId] ?: "OUT")
                             }
@@ -268,7 +273,8 @@ fun AppScreen(
                             OutlinedButton(
                                 onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.NOTE) },
                                 modifier = Modifier.weight(1f),
-                                enabled = stochasticState.outputMode != MidiOutputMode.NOTE
+                                enabled = stochasticState.outputMode != MidiOutputMode.NOTE,
+                                shape = ProtoControlShape
                             ) {
                                 Text(text = "N")
                             }
@@ -276,7 +282,8 @@ fun AppScreen(
                             OutlinedButton(
                                 onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.CC) },
                                 modifier = Modifier.weight(1f),
-                                enabled = stochasticState.outputMode != MidiOutputMode.CC
+                                enabled = stochasticState.outputMode != MidiOutputMode.CC,
+                                shape = ProtoControlShape
                             ) {
                                 Text(text = "C")
                             }
