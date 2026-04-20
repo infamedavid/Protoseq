@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -58,6 +60,7 @@ fun AppScreen(
     stochasticViewModel: StochasticSequencerViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val uriHandler = LocalUriHandler.current
     val appVersion = remember(context) {
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -463,8 +466,54 @@ fun AppScreen(
         if (showAboutDialog) {
             AlertDialog(
                 onDismissRequest = { showAboutDialog = false },
+                icon = {
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.protoseq_mark),
+                            contentDescription = "Protoseq logo",
+                            modifier = Modifier.size(92.dp)
+                        )
+                    }
+                },
                 title = { Text(text = "Protoseq") },
-                text = { Text(text = "Version $appVersion") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(
+                            text = "Version $appVersion\n\n" +
+                                    "Protoseq is an open-source MIDI sequencer for mobile devices. " +
+                                    "Its core generative behavior is inspired by the Turing Machine, " +
+                                    "the random looping sequencer by Tom Whitwell / Music Thing Modular."
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    uriHandler.openUri("https://github.com/infamedavid/Protoseq")
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = ProtoControlShape
+                            ) {
+                                Text("SOURCE")
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    uriHandler.openUri("https://www.paypal.com/paypalme/Davidb3d")
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = ProtoControlShape
+                            ) {
+                                Text("DONATE")
+                            }
+                        }
+                    }
+                },
                 confirmButton = {
                     TextButton(onClick = { showAboutDialog = false }) {
                         Text("OK")
