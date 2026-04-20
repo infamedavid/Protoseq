@@ -52,7 +52,7 @@ class MidiDeviceRepository(
                     callback
                 )
             } else {
-                manager.registerDeviceCallback(callback, callbackHandler)
+                registerLegacyDeviceCallback(manager, callback)
             }
         }
 
@@ -77,7 +77,7 @@ class MidiDeviceRepository(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 manager.getDevicesForTransport(MidiManager.TRANSPORT_MIDI_BYTE_STREAM).toList()
             } else {
-                manager.devices.toList()
+                getLegacyDevices(manager)
             }
 
         outputTargets = devices.flatMap { deviceInfo ->
@@ -96,6 +96,21 @@ class MidiDeviceRepository(
 
     private fun notifyDeviceChange() {
         onDevicesChanged?.invoke(refreshDevices())
+    }
+
+    @Suppress("DEPRECATION")
+    private fun registerLegacyDeviceCallback(
+        manager: MidiManager,
+        callback: MidiManager.DeviceCallback
+    ) {
+        // Legacy fallback for API < 33
+        manager.registerDeviceCallback(callback, callbackHandler)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun getLegacyDevices(manager: MidiManager): List<MidiDeviceInfo> {
+        // Legacy fallback for API < 33
+        return manager.devices.toList()
     }
 }
 
