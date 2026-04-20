@@ -1,6 +1,7 @@
 package com.infamedavid.protoseq.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,14 +13,20 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -45,6 +52,8 @@ fun AppScreen(
     )
     val transportState by transportViewModel.uiState.collectAsState()
     val stochasticState by stochasticViewModel.uiState.collectAsState()
+    var showBpmInputDialog by rememberSaveable { mutableStateOf(false) }
+    var bpmInputText by rememberSaveable { mutableStateOf("") }
     LaunchedEffect(stochasticState) {
         transportViewModel.updateSequencerConfig(stochasticState.toConfig())
     }
@@ -67,12 +76,35 @@ fun AppScreen(
                 ) {
                     ProtoSliderRow(
                         label = "BPM ",
-                        value = (transportState.bpm - 40f) / 200f,
-                        valueText = transportState.bpm.toInt().toString(),
+                        value = (transportState.bpm - 1f) / 299f,
+                        valueText = "${transportState.bpm.toInt()} BPM",
                         onValueChange = { normalized ->
-                            transportViewModel.setBpm(40f + (normalized * 200f))
+                            transportViewModel.setBpm(1f + (normalized * 299f))
                         }
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(onClick = transportViewModel::decrementBpm) {
+                            Text(text = "-")
+                        }
+
+                        Text(
+                            text = "${transportState.bpm.toInt()} BPM",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.clickable {
+                                bpmInputText = transportState.bpm.toInt().toString()
+                                showBpmInputDialog = true
+                            }
+                        )
+
+                        OutlinedButton(onClick = transportViewModel::incrementBpm) {
+                            Text(text = "+")
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -317,6 +349,38 @@ fun AppScreen(
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
+    }
+
+    if (showBpmInputDialog) {
+        AlertDialog(
+            onDismissRequest = { showBpmInputDialog = false },
+            title = { Text(text = "Set BPM") },
+            text = {
+                OutlinedTextField(
+                    value = bpmInputText,
+                    onValueChange = { input ->
+                        bpmInputText = input.filter { it.isDigit() }
+                    },
+                    singleLine = true,
+                    label = { Text("BPM (1-300)") }
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        bpmInputText.toIntOrNull()?.toFloat()?.let(transportViewModel::setBpm)
+                        showBpmInputDialog = false
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBpmInputDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
 
