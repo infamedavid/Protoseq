@@ -24,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class TransportViewModel(
     private val clockEngine: ClockEngine = ClockEngine(),
@@ -36,6 +37,8 @@ class TransportViewModel(
     private val sequencerEngine = StochasticSequencerEngine()
     private var sequencerConfig: StochasticSequencerConfig = StochasticSequencerUiState().toConfig()
     private val scheduledNoteOffs = mutableListOf<ScheduledNoteOff>()
+    private var lastSentCcValue: Int? = null
+    private var activeCcSlew: ActiveCcSlew? = null
 
     private val _uiState = MutableStateFlow(
         TransportUiState(
@@ -65,6 +68,7 @@ class TransportViewModel(
                 if (isSequencerStepTick(tick)) {
                     advanceSequencer(tick)
                 }
+                processCcSlewTick()
                 if (tick % 4L == 0L) {
                     midiEngine.sendClock()
                 }
@@ -93,6 +97,7 @@ class TransportViewModel(
         when (clockEngine.getTransportState()) {
             TransportState.Stopped -> {
                 sendAndClearPendingNoteOffs()
+                clearCcSlewState()
                 sequencerEngine.reset()
                 clockEngine.playFromStart()
                 midiEngine.sendStart()
@@ -112,6 +117,7 @@ class TransportViewModel(
             TransportState.Playing,
             TransportState.Paused -> {
                 sendAndClearPendingNoteOffs()
+                clearCcSlewState()
                 clockEngine.stop()
                 midiEngine.sendStop()
             }
@@ -169,13 +175,65 @@ class TransportViewModel(
                 val ccValue = output.ccValue ?: return
                 if (!output.gate || !output.trigger) return
 
-                midiEngine.sendControlChange(
-                    channel = sequencerConfig.midiChannel,
-                    controller = sequencerConfig.ccNumber,
-                    value = ccValue
-                )
+                val slewTicks = (sequencerConfig.slewAmount * TICKS_PER_STEP.toFloat())
+                    .roundToInt()
+                    .coerceIn(0, TICKS_PER_STEP.toInt())
+                if (slewTicks <= 0) {
+                    activeCcSlew = null
+                    sendControlChangeIfNeeded(ccValue)
+                    return
+                }
+
+                val startValue = lastSentCcValue ?: ccValue
+                if (startValue == ccValue) {
+                    activeCcSlew = null
+                    sendControlChangeIfNeeded(ccValue)
+                } else {
+                    activeCcSlew = ActiveCcSlew(
+                        startValue = startValue,
+                        targetValue = ccValue,
+                        durationTicks = slewTicks,
+                        elapsedTicks = 0
+                    )
+                }
             }
         }
+    }
+
+    private fun processCcSlewTick() {
+        val slew = activeCcSlew ?: return
+        val nextElapsed = (slew.elapsedTicks + 1).coerceAtMost(slew.durationTicks)
+        val progress = nextElapsed.toFloat() / slew.durationTicks.toFloat()
+        val interpolated = slew.startValue + (slew.targetValue - slew.startValue) * progress
+        val nextValue = if (nextElapsed >= slew.durationTicks) {
+            slew.targetValue
+        } else {
+            interpolated.roundToInt().coerceIn(MIDI_MIN, MIDI_MAX)
+        }
+
+        sendControlChangeIfNeeded(nextValue)
+
+        activeCcSlew = if (nextElapsed >= slew.durationTicks) {
+            null
+        } else {
+            slew.copy(elapsedTicks = nextElapsed)
+        }
+    }
+
+    private fun sendControlChangeIfNeeded(value: Int) {
+        val ccValue = value.coerceIn(MIDI_MIN, MIDI_MAX)
+        if (lastSentCcValue == ccValue) return
+
+        midiEngine.sendControlChange(
+            channel = sequencerConfig.midiChannel,
+            controller = sequencerConfig.ccNumber,
+            value = ccValue
+        )
+        lastSentCcValue = ccValue
+    }
+
+    private fun clearCcSlewState() {
+        activeCcSlew = null
     }
 
     private fun sendAndClearPendingNoteOffs() {
@@ -194,6 +252,8 @@ class TransportViewModel(
 
     companion object {
         private const val TICKS_PER_STEP = 24L
+        private const val MIDI_MIN = 0
+        private const val MIDI_MAX = 127
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -214,6 +274,13 @@ class TransportViewModel(
             }
         }
     }
+
+    private data class ActiveCcSlew(
+        val startValue: Int,
+        val targetValue: Int,
+        val durationTicks: Int,
+        val elapsedTicks: Int
+    )
 
     private data class ScheduledNoteOff(
         val dueTick: Long,
