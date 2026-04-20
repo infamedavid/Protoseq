@@ -1,6 +1,7 @@
 package com.infamedavid.protoseq.ui.theme
 
 import androidx.compose.material3.Typography
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -13,19 +14,64 @@ private val Rajdhani = FontFamily(
 )
 
 val ProtoseqTypography = Typography(
-    displayLarge = Typography().displayLarge.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Bold),
-    displayMedium = Typography().displayMedium.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Bold),
-    displaySmall = Typography().displaySmall.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    headlineLarge = Typography().headlineLarge.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Bold),
-    headlineMedium = Typography().headlineMedium.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    headlineSmall = Typography().headlineSmall.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    titleLarge = Typography().titleLarge.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    titleMedium = Typography().titleMedium.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    titleSmall = Typography().titleSmall.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    bodyLarge = Typography().bodyLarge.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Medium),
-    bodyMedium = Typography().bodyMedium.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Medium),
-    bodySmall = Typography().bodySmall.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Medium),
-    labelLarge = Typography().labelLarge.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    labelMedium = Typography().labelMedium.copy(fontFamily = Rajdhani, fontWeight = FontWeight.SemiBold),
-    labelSmall = Typography().labelSmall.copy(fontFamily = Rajdhani, fontWeight = FontWeight.Medium)
+    displayLarge = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.Bold
+    ),
+    displayMedium = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.Bold
+    ),
+    displaySmall = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    headlineLarge = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.Bold
+    ),
+    headlineMedium = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    headlineSmall = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    titleLarge = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.Bold
+    ),
+    titleMedium = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    titleSmall = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    bodyLarge = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    bodyMedium = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    bodySmall = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.Medium
+    ),
+    labelLarge = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    labelMedium = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.SemiBold
+    ),
+    labelSmall = TextStyle(
+        fontFamily = Rajdhani,
+        fontWeight = FontWeight.Medium
+    )
 )
