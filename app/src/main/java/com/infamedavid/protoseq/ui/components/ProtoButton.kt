@@ -2,7 +2,6 @@ package com.infamedavid.protoseq.ui.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -20,7 +19,7 @@ fun ProtoButton(
     Button(
         onClick = onClick,
         modifier = modifier.height(50.dp),
-        shape = RoundedCornerShape(12.dp),
+        shape = ProtoControlShape,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f)),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,

@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -44,7 +43,7 @@ fun ProtoValueField(
                 modifier = Modifier
                     .weight(0.8f)
                     .height(48.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = ProtoControlShape,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
             ) {
                 Text(text = "-")
@@ -70,7 +69,7 @@ fun ProtoValueField(
                 modifier = Modifier
                     .weight(0.8f)
                     .height(48.dp),
-                shape = RoundedCornerShape(10.dp),
+                shape = ProtoControlShape,
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.25f))
             ) {
                 Text(text = "+")
