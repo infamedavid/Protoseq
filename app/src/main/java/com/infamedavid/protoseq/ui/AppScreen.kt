@@ -176,10 +176,10 @@ fun AppScreen(
 
                     ProtoDualSliderRow(
                         leftLabel = "RANG",
-                        leftValue = (stochasticState.pitchRangeOctaves - 1) / 4f,
-                        leftValueText = "${stochasticState.pitchRangeOctaves} OCT",
+                        leftValue = (stochasticState.pitchRangeSemitones - 1) / 63f,
+                        leftValueText = formatPitchRange(stochasticState.pitchRangeSemitones),
                         onLeftValueChange = { normalized ->
-                            stochasticViewModel.setPitchRangeOctaves((1 + normalized * 4).toInt())
+                            stochasticViewModel.setPitchRangeSemitones((1 + normalized * 63).toInt())
                         },
                         rightLabel = "OFST",
                         rightValue = (stochasticState.pitchOffset + 24) / 48f,
@@ -317,5 +317,18 @@ fun AppScreen(
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
+    }
+}
+
+
+private fun formatPitchRange(semitones: Int): String {
+    val safeSemitones = semitones.coerceIn(1, 64)
+    val octaves = safeSemitones / 12
+    val remainder = safeSemitones % 12
+
+    return if (remainder == 0) {
+        "${octaves} OCT"
+    } else {
+        "${octaves} OCT + ${remainder}"
     }
 }

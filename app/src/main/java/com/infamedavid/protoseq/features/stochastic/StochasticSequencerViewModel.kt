@@ -74,8 +74,8 @@ class StochasticSequencerViewModel : ViewModel() {
         _uiState.value = _uiState.value.copy(slewAmount = amount.coerceIn(0f, 1f))
     }
 
-    fun setPitchRangeOctaves(octaves: Int) {
-        _uiState.value = _uiState.value.copy(pitchRangeOctaves = octaves.coerceIn(1, 5))
+    fun setPitchRangeSemitones(semitones: Int) {
+        _uiState.value = _uiState.value.copy(pitchRangeSemitones = semitones.coerceIn(1, 64))
     }
 
     fun setPitchOffset(offset: Int) {

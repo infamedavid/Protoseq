@@ -11,7 +11,7 @@ data class StochasticSequencerUiState(
     val baseNote: Int = 49,
     val quantizationMode: QuantizationMode = QuantizationMode.PMIN,
     val slewAmount: Float = 0.10f,
-    val pitchRangeOctaves: Int = 2,
+    val pitchRangeSemitones: Int = 24,
     val pitchOffset: Int = 0,
     val gateLength: Float = 0.45f,
     val randomGateLength: Float = 0.20f,
