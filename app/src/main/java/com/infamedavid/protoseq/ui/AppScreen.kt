@@ -13,6 +13,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -34,8 +37,8 @@ import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ModuleCard
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
-import com.infamedavid.protoseq.ui.components.ProtoSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoValueField
+import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
 @Composable
@@ -71,13 +74,16 @@ fun AppScreen(
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    ProtoSliderRow(
-                        label = "BPM ",
-                        value = (transportState.bpm - 1f) / 299f,
-                        valueText = transportState.bpm.toInt().toString(),
+                    Slider(
+                        value = ((transportState.bpm - 1f) / 299f).coerceIn(0f, 1f),
                         onValueChange = { normalized ->
                             transportViewModel.setBpm(1f + (normalized * 299f))
-                        }
+                        },
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     )
 
                     Row(
@@ -136,17 +142,9 @@ fun AppScreen(
                         }
                     }
 
-                    val selectedMidiTarget = transportState.midiOutputTargets.firstOrNull {
-                        it.selectionId == transportState.selectedMidiOutputId
+                    val midiTargetLabels = remember(transportState.midiOutputTargets) {
+                        buildMidiTargetShortLabels(transportState.midiOutputTargets)
                     }
-
-                    Text(
-                        text = selectedMidiTarget?.let {
-                            "MIDI OUT: ${it.name} (IN ${it.inputPortNumber + 1})"
-                        } ?: "No MIDI output selected",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
 
                     if (transportState.midiOutputTargets.isEmpty()) {
                         Text(
@@ -173,7 +171,7 @@ fun AppScreen(
                                     },
                                     enabled = transportState.selectedMidiOutputId != target.selectionId
                                 ) {
-                                    Text(text = "${target.name} IN${target.inputPortNumber + 1}")
+                                    Text(text = midiTargetLabels[target.selectionId] ?: "OUT")
                                 }
                             }
                         }
