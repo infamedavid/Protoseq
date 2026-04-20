@@ -19,6 +19,7 @@ private val ProtoseqColors = lightColorScheme(
 fun ProtoseqTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = ProtoseqColors,
+        typography = ProtoseqTypography,
         content = content
     )
 }
