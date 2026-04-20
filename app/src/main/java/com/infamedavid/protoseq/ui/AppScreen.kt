@@ -330,45 +330,6 @@ fun AppScreen(
                     }
                 }
             }
-            SectionDivider()
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = "CH ${stochasticState.midiChannel}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = "NOTE ${midiNoteToDisplay(stochasticState.baseNote)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = "GATE ON",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = "TRIG YES",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-
-                Text(
-                    text = "LEN ${(stochasticState.gateLength * 100).toInt()}%",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
             Spacer(modifier = Modifier.weight(1f))
         }
 
