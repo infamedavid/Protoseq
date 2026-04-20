@@ -4,11 +4,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -29,8 +33,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.infamedavid.protoseq.BuildConfig
+import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
@@ -57,6 +64,7 @@ fun AppScreen(
     var showBpmInputDialog by rememberSaveable { mutableStateOf(false) }
     var bpmInputText by rememberSaveable { mutableStateOf("") }
     var showQuantizationDialog by rememberSaveable { mutableStateOf(false) }
+    var showAboutDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(stochasticState) {
         transportViewModel.updateSequencerConfig(stochasticState.toConfig())
@@ -330,6 +338,36 @@ fun AppScreen(
                     }
                 }
             }
+            SectionDivider()
+            Spacer(modifier = Modifier.height(44.dp))
+            SectionDivider()
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OutlinedButton(
+                    onClick = { showAboutDialog = true },
+                    shape = ProtoControlShape
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.protoseq_mark),
+                        contentDescription = "About",
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.size(8.dp))
+                    Text(text = "About")
+                }
+
+                Image(
+                    painter = painterResource(id = R.drawable.protoseq_wordmark),
+                    contentDescription = "Protoseq",
+                    modifier = Modifier.height(18.dp)
+                )
+            }
             Spacer(modifier = Modifier.weight(1f))
         }
 
@@ -393,6 +431,19 @@ fun AppScreen(
                 dismissButton = {
                     TextButton(onClick = { showQuantizationDialog = false }) {
                         Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showAboutDialog) {
+            AlertDialog(
+                onDismissRequest = { showAboutDialog = false },
+                title = { Text(text = "Protoseq") },
+                text = { Text(text = "Version ${BuildConfig.VERSION_NAME}") },
+                confirmButton = {
+                    TextButton(onClick = { showAboutDialog = false }) {
+                        Text("OK")
                     }
                 }
             )
