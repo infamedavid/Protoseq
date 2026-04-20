@@ -91,7 +91,7 @@ class StochasticSequencerEngine {
     }
 
     private fun mapNote(rawValue: Int, config: StochasticSequencerConfig): Int {
-        val semitoneRange = (config.pitchRangeOctaves * SEMITONES_PER_OCTAVE).coerceAtLeast(0)
+        val semitoneRange = config.pitchRangeSemitones.coerceIn(1, 64)
         val mappedOffset = ((rawValue.toFloat() / RAW_MAX_VALUE.toFloat()) * semitoneRange)
             .roundToInt()
             .coerceIn(0, semitoneRange)
@@ -129,7 +129,6 @@ class StochasticSequencerEngine {
         private const val RAW_WINDOW_SIZE = 8
         private const val RAW_MAX_VALUE = 255
         private const val TICKS_PER_STEP = 24
-        private const val SEMITONES_PER_OCTAVE = 12
         private const val MIDI_MIN = 0
         private const val MIDI_MAX = 127
     }
