@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.infamedavid.protoseq.ui.theme.ProtoSlider
+import com.infamedavid.protoseq.ui.theme.ProtoTrack
 
 @Composable
 fun ProtoSliderRow(
@@ -49,9 +51,11 @@ fun ProtoSliderRow(
             onValueChange = onValueChange,
             valueRange = valueRange,
             colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.surfaceVariant,
-                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                thumbColor = ProtoSlider,
+                activeTrackColor = ProtoTrack,
+                inactiveTrackColor = ProtoTrack,
+                activeTickColor = ProtoTrack,
+                inactiveTickColor = ProtoTrack
             )
         )
     }
