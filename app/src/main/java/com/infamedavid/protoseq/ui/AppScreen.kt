@@ -25,7 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -52,8 +52,10 @@ fun AppScreen(
     )
     val transportState by transportViewModel.uiState.collectAsState()
     val stochasticState by stochasticViewModel.uiState.collectAsState()
+
     var showBpmInputDialog by rememberSaveable { mutableStateOf(false) }
     var bpmInputText by rememberSaveable { mutableStateOf("") }
+
     LaunchedEffect(stochasticState) {
         transportViewModel.updateSequencerConfig(stochasticState.toConfig())
     }
@@ -77,7 +79,7 @@ fun AppScreen(
                     ProtoSliderRow(
                         label = "BPM ",
                         value = (transportState.bpm - 1f) / 299f,
-                        valueText = "${transportState.bpm.toInt()} BPM",
+                        valueText = transportState.bpm.toInt().toString(),
                         onValueChange = { normalized ->
                             transportViewModel.setBpm(1f + (normalized * 299f))
                         }
@@ -85,23 +87,30 @@ fun AppScreen(
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        OutlinedButton(onClick = transportViewModel::decrementBpm) {
+                        OutlinedButton(
+                            onClick = { transportViewModel.setBpm(transportState.bpm - 1f) }
+                        ) {
                             Text(text = "-")
                         }
 
                         Text(
                             text = "${transportState.bpm.toInt()} BPM",
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    bpmInputText = transportState.bpm.toInt().toString()
+                                    showBpmInputDialog = true
+                                }
+                                .padding(vertical = 12.dp),
                             style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.clickable {
-                                bpmInputText = transportState.bpm.toInt().toString()
-                                showBpmInputDialog = true
-                            }
+                            color = MaterialTheme.colorScheme.onSurface
                         )
 
-                        OutlinedButton(onClick = transportViewModel::incrementBpm) {
+                        OutlinedButton(
+                            onClick = { transportViewModel.setBpm(transportState.bpm + 1f) }
+                        ) {
                             Text(text = "+")
                         }
                     }
@@ -206,10 +215,19 @@ fun AppScreen(
                         onRightValueChange = stochasticViewModel::setBernoulliProbability
                     )
 
+                    val rangeSemitones = stochasticState.pitchRangeSemitones
+                    val rangeOctaves = rangeSemitones / 12
+                    val rangeRemainder = rangeSemitones % 12
+                    val rangeDisplay = if (rangeRemainder == 0) {
+                        "$rangeOctaves OCT"
+                    } else {
+                        "$rangeOctaves OCT + $rangeRemainder"
+                    }
+
                     ProtoDualSliderRow(
                         leftLabel = "RANG",
-                        leftValue = (stochasticState.pitchRangeSemitones - 1) / 63f,
-                        leftValueText = formatPitchRange(stochasticState.pitchRangeSemitones),
+                        leftValue = (rangeSemitones - 1) / 63f,
+                        leftValueText = rangeDisplay,
                         onLeftValueChange = { normalized ->
                             stochasticViewModel.setPitchRangeSemitones((1 + normalized * 63).toInt())
                         },
@@ -349,50 +367,41 @@ fun AppScreen(
             Spacer(modifier = Modifier.weight(1f))
             Spacer(modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars))
         }
-    }
 
-    if (showBpmInputDialog) {
-        AlertDialog(
-            onDismissRequest = { showBpmInputDialog = false },
-            title = { Text(text = "Set BPM") },
-            text = {
-                OutlinedTextField(
-                    value = bpmInputText,
-                    onValueChange = { input ->
-                        bpmInputText = input.filter { it.isDigit() }
-                    },
-                    singleLine = true,
-                    label = { Text("BPM (1-300)") }
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        bpmInputText.toIntOrNull()?.toFloat()?.let(transportViewModel::setBpm)
-                        showBpmInputDialog = false
+        if (showBpmInputDialog) {
+            AlertDialog(
+                onDismissRequest = { showBpmInputDialog = false },
+                title = { Text(text = "Set BPM") },
+                text = {
+                    OutlinedTextField(
+                        value = bpmInputText,
+                        onValueChange = { input: String ->
+                            bpmInputText = input.filter { ch -> ch.isDigit() }
+                        },
+                        singleLine = true,
+                        label = { Text("BPM (1-300)") }
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            bpmInputText
+                                .toIntOrNull()
+                                ?.coerceIn(1, 300)
+                                ?.toFloat()
+                                ?.let(transportViewModel::setBpm)
+                            showBpmInputDialog = false
+                        }
+                    ) {
+                        Text("OK")
                     }
-                ) {
-                    Text("OK")
+                },
+                dismissButton = {
+                    TextButton(onClick = { showBpmInputDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showBpmInputDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-}
-
-
-private fun formatPitchRange(semitones: Int): String {
-    val safeSemitones = semitones.coerceIn(1, 64)
-    val octaves = safeSemitones / 12
-    val remainder = safeSemitones % 12
-
-    return if (remainder == 0) {
-        "${octaves} OCT"
-    } else {
-        "${octaves} OCT + ${remainder}"
+            )
+        }
     }
 }
