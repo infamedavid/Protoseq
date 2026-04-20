@@ -2,12 +2,12 @@ package com.infamedavid.protoseq.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val ProtoBackground = Color(0xFFE7E3DD)
-val ProtoPanel = Color(0xFFF4F1EC)
-val ProtoPanelAlt = Color(0xFFD6D0C8)
-val ProtoAccent = Color(0xFF9A5A2E)
-val ProtoAccentSoft = Color(0xFFB97A50)
-val ProtoText = Color(0xFF2A2521)
-val ProtoMuted = Color(0xFF6E655E)
-val ProtoTrack = Color(0xFFC9C1B7)
-val ProtoSlider = Color(0xFFB06A3E)
+val ProtoBackground = Color(0xFFE4E4E1)
+val ProtoPanel = Color(0xFFF1F1EF)
+val ProtoPanelAlt = Color(0xFFD4D4D1)
+val ProtoAccent = Color(0xFF33363B)
+val ProtoAccentSoft = Color(0xFF4A4E55)
+val ProtoText = Color(0xFF25282D)
+val ProtoMuted = Color(0xFF666B73)
+val ProtoTrack = Color(0xFFC6C8CC)
+val ProtoSlider = Color(0xFF34383E)
