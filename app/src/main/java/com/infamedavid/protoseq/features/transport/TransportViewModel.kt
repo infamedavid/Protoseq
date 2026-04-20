@@ -77,9 +77,17 @@ class TransportViewModel(
     }
 
     fun setBpm(bpm: Float) {
-        val clampedBpm = bpm.coerceIn(40f, 240f)
+        val clampedBpm = bpm.coerceIn(1f, 300f)
         clockEngine.setBpm(clampedBpm.toDouble())
         _uiState.value = _uiState.value.copy(bpm = clampedBpm)
+    }
+
+    fun incrementBpm() {
+        setBpm(_uiState.value.bpm + 1f)
+    }
+
+    fun decrementBpm() {
+        setBpm(_uiState.value.bpm - 1f)
     }
 
     fun selectMidiOutputTarget(selectionId: String) {

@@ -32,7 +32,7 @@ class ClockEngine(
     private var clockJob: Job? = null
 
     fun setBpm(value: Double) {
-        bpm = value.coerceIn(20.0, 300.0)
+        bpm = value.coerceIn(1.0, 300.0)
     }
 
     fun getBpm(): Double = bpm
