@@ -1,18 +1,21 @@
 package com.infamedavid.protoseq.ui
 
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -31,12 +34,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.infamedavid.protoseq.BuildConfig
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
@@ -55,6 +58,24 @@ fun AppScreen(
     stochasticViewModel: StochasticSequencerViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val appVersion = remember(context) {
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager
+                    .getPackageInfo(
+                        context.packageName,
+                        PackageManager.PackageInfoFlags.of(0)
+                    )
+                    .versionName
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager
+                    .getPackageInfo(context.packageName, 0)
+                    .versionName
+            }
+        }.getOrNull() ?: "?"
+    }
+
     val transportViewModel: TransportViewModel = viewModel(
         factory = TransportViewModel.factory(context)
     )
@@ -78,7 +99,7 @@ fun AppScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
+                .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 4.dp),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
             Column(
@@ -194,6 +215,7 @@ fun AppScreen(
                     }
                 }
             }
+
             SectionDivider()
 
             Column(
@@ -338,28 +360,30 @@ fun AppScreen(
                     }
                 }
             }
-            SectionDivider()
-            Spacer(modifier = Modifier.height(44.dp))
+
+            Spacer(modifier = Modifier.weight(1f))
             SectionDivider()
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp),
+                    .padding(top = 10.dp, bottom = 2.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 OutlinedButton(
                     onClick = { showAboutDialog = true },
-                    shape = ProtoControlShape
+                    modifier = Modifier
+                        .width(50.dp)
+                        .height(44.dp),
+                    shape = ProtoControlShape,
+                    contentPadding = PaddingValues(0.dp)
                 ) {
                     Image(
                         painter = painterResource(id = R.drawable.protoseq_mark),
                         contentDescription = "About",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(34.dp)
                     )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(text = "About")
                 }
 
                 Image(
@@ -368,7 +392,6 @@ fun AppScreen(
                     modifier = Modifier.height(18.dp)
                 )
             }
-            Spacer(modifier = Modifier.weight(1f))
         }
 
         if (showBpmInputDialog) {
@@ -421,7 +444,8 @@ fun AppScreen(
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val selectedPrefix = if (mode == stochasticState.quantizationMode) "✓ " else ""
+                                val selectedPrefix =
+                                    if (mode == stochasticState.quantizationMode) "✓ " else ""
                                 Text(text = "$selectedPrefix${mode.displayName}")
                             }
                         }
@@ -440,7 +464,7 @@ fun AppScreen(
             AlertDialog(
                 onDismissRequest = { showAboutDialog = false },
                 title = { Text(text = "Protoseq") },
-                text = { Text(text = "Version ${BuildConfig.VERSION_NAME}") },
+                text = { Text(text = "Version $appVersion") },
                 confirmButton = {
                     TextButton(onClick = { showAboutDialog = false }) {
                         Text("OK")
