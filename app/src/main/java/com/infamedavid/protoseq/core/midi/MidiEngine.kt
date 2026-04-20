@@ -75,4 +75,8 @@ class MidiEngine(
     fun sendNoteOff(channel: Int, note: Int, velocity: Int = 0) {
         messageSender.sendNoteOff(channel, note, velocity)
     }
+
+    fun sendControlChange(channel: Int, controller: Int, value: Int) {
+        messageSender.sendControlChange(channel, controller, value)
+    }
 }

@@ -85,6 +85,17 @@ class AndroidMidiMessageSender(
         )
     }
 
+    override fun sendControlChange(channel: Int, controller: Int, value: Int) {
+        val status = (0xB0 or ((channel.coerceIn(1, 16)) - 1)).toByte()
+        sendMessage(
+            byteArrayOf(
+                status,
+                controller.coerceIn(0, 127).toByte(),
+                value.coerceIn(0, 127).toByte()
+            )
+        )
+    }
+
     private fun sendMessage(data: ByteArray) {
         synchronized(lock) {
             val inputPort = currentInputPort ?: return

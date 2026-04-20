@@ -9,4 +9,5 @@ class NoOpMidiMessageSender : MidiMessageSender {
     override fun sendClock() = Unit
     override fun sendNoteOn(channel: Int, note: Int, velocity: Int) = Unit
     override fun sendNoteOff(channel: Int, note: Int, velocity: Int) = Unit
+    override fun sendControlChange(channel: Int, controller: Int, value: Int) = Unit
 }

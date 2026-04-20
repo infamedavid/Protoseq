@@ -149,19 +149,33 @@ class TransportViewModel(
 
     private fun advanceSequencer(currentTick: Long) {
         val output = sequencerEngine.advance(sequencerConfig)
-        if (sequencerConfig.outputMode != MidiOutputMode.NOTE) return
-        val note = output.note ?: return
-        if (!output.gate || !output.trigger) return
+        when (sequencerConfig.outputMode) {
+            MidiOutputMode.NOTE -> {
+                val note = output.note ?: return
+                if (!output.gate || !output.trigger) return
 
-        midiEngine.sendNoteOn(
-            channel = sequencerConfig.midiChannel,
-            note = note
-        )
-        scheduledNoteOffs += ScheduledNoteOff(
-            dueTick = currentTick + output.gateLengthTicks,
-            channel = sequencerConfig.midiChannel,
-            note = note
-        )
+                midiEngine.sendNoteOn(
+                    channel = sequencerConfig.midiChannel,
+                    note = note
+                )
+                scheduledNoteOffs += ScheduledNoteOff(
+                    dueTick = currentTick + output.gateLengthTicks,
+                    channel = sequencerConfig.midiChannel,
+                    note = note
+                )
+            }
+
+            MidiOutputMode.CC -> {
+                val ccValue = output.ccValue ?: return
+                if (!output.gate || !output.trigger) return
+
+                midiEngine.sendControlChange(
+                    channel = sequencerConfig.midiChannel,
+                    controller = sequencerConfig.ccNumber,
+                    value = ccValue
+                )
+            }
+        }
     }
 
     private fun sendAndClearPendingNoteOffs() {
