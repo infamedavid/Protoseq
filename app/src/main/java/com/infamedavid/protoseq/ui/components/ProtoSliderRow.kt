@@ -50,7 +50,7 @@ fun ProtoSliderRow(
             valueRange = valueRange,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary,
+                activeTrackColor = MaterialTheme.colorScheme.surfaceVariant,
                 inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
             )
         )
