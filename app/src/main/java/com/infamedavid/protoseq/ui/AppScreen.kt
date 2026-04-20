@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
 import com.infamedavid.protoseq.features.stochastic.toConfig
@@ -55,6 +56,7 @@ fun AppScreen(
 
     var showBpmInputDialog by rememberSaveable { mutableStateOf(false) }
     var bpmInputText by rememberSaveable { mutableStateOf("") }
+    var showQuantizationDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(stochasticState) {
         transportViewModel.updateSequencerConfig(stochasticState.toConfig())
@@ -310,8 +312,7 @@ fun AppScreen(
                         label = "QUAN",
                         value = stochasticState.quantizationMode.displayName,
                         modifier = Modifier.weight(1f),
-                        onDecrement = stochasticViewModel::previousQuantizationMode,
-                        onIncrement = stochasticViewModel::nextQuantizationMode
+                        onClick = { showQuantizationDialog = true }
                     )
 
                     if (stochasticState.outputMode == MidiOutputMode.CC) {
@@ -401,6 +402,35 @@ fun AppScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { showBpmInputDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showQuantizationDialog) {
+            AlertDialog(
+                onDismissRequest = { showQuantizationDialog = false },
+                title = { Text(text = "Select quantization") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        QuantizationMode.entries.forEach { mode ->
+                            TextButton(
+                                onClick = {
+                                    stochasticViewModel.setQuantizationMode(mode)
+                                    showQuantizationDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val selectedPrefix = if (mode == stochasticState.quantizationMode) "✓ " else ""
+                                Text(text = "$selectedPrefix${mode.displayName}")
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showQuantizationDialog = false }) {
                         Text("Cancel")
                     }
                 }
