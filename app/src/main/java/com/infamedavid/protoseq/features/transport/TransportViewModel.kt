@@ -167,6 +167,8 @@ class TransportViewModel(
     }
 
     fun pressRptr(division: RptrDivision, config: StochasticSequencerConfig) {
+        if (isRptrBusy()) return
+
         val rptrConfig = RptrConfig(
             baseUnits = config.rptrBaseUnits,
             startMode = config.rptrStartMode
@@ -183,6 +185,15 @@ class TransportViewModel(
         val releaseResult = repeaterEngine.release(currentTick = latestClockTick)
         sendRepeaterMidi(releaseResult.midi)
         syncRptrUiState()
+    }
+
+    private fun isRptrBusy(): Boolean = when (repeaterEngine.getState()) {
+        is RptrState.Wait,
+        is RptrState.Record,
+        is RptrState.Loop -> true
+
+        is RptrState.Idle,
+        is RptrState.Release -> false
     }
 
     private fun isSequencerStepTick(tick: Long): Boolean = ((tick - 1L) % TICKS_PER_STEP) == 0L
