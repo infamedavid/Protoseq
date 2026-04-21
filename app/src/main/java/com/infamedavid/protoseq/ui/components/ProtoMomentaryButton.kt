@@ -6,7 +6,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.defaultMinSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
@@ -64,7 +63,6 @@ fun ProtoMomentaryButton(
         modifier = modifier
             .height(50.dp)
             .defaultMinSize(minHeight = 50.dp)
-            .fillMaxWidth()
             .clip(ProtoControlShape)
             .background(color = containerColor, shape = ProtoControlShape)
             .border(BorderStroke(1.dp, borderColor), shape = ProtoControlShape)
