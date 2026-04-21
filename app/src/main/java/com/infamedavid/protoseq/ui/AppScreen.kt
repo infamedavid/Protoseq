@@ -50,6 +50,7 @@ import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.ui.components.ProtoMomentaryButton
+import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
@@ -366,7 +367,10 @@ fun AppScreen(
                     }
                 }
 
-                val rptrControlsEnabled = stochasticState.outputMode != MidiOutputMode.CC
+                val rptrIsRuntimeActive = transportState.rptrState != RptrUiRuntimeState.Idle
+                val rptrBlockEnabled = stochasticState.outputMode != MidiOutputMode.CC
+                val rptrConfigControlsEnabled = rptrBlockEnabled && !rptrIsRuntimeActive
+                val rptrDivisionButtonsEnabled = rptrBlockEnabled
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -392,7 +396,7 @@ fun AppScreen(
                                 modifier = Modifier
                                     .weight(0.8f)
                                     .height(48.dp),
-                                enabled = rptrControlsEnabled,
+                                enabled = rptrConfigControlsEnabled,
                                 shape = ProtoControlShape
                             ) {
                                 Text(text = "-")
@@ -418,7 +422,7 @@ fun AppScreen(
                                 modifier = Modifier
                                     .weight(0.8f)
                                     .height(48.dp),
-                                enabled = rptrControlsEnabled,
+                                enabled = rptrConfigControlsEnabled,
                                 shape = ProtoControlShape
                             ) {
                                 Text(text = "+")
@@ -445,7 +449,7 @@ fun AppScreen(
                                     stochasticViewModel.setRptrStartMode(RptrStartMode.FREE)
                                 },
                                 modifier = Modifier.weight(1f),
-                                enabled = rptrControlsEnabled &&
+                                enabled = rptrConfigControlsEnabled &&
                                         stochasticState.rptrStartMode != RptrStartMode.FREE,
                                 shape = ProtoControlShape
                             ) {
@@ -457,7 +461,7 @@ fun AppScreen(
                                     stochasticViewModel.setRptrStartMode(RptrStartMode.GRID)
                                 },
                                 modifier = Modifier.weight(1f),
-                                enabled = rptrControlsEnabled &&
+                                enabled = rptrConfigControlsEnabled &&
                                         stochasticState.rptrStartMode != RptrStartMode.GRID,
                                 shape = ProtoControlShape
                             ) {
@@ -490,7 +494,7 @@ fun AppScreen(
                                 transportViewModel.releaseRptr()
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = rptrControlsEnabled
+                            enabled = rptrDivisionButtonsEnabled
                         )
                     }
                 }
