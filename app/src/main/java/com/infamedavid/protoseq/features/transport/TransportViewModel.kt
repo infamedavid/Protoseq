@@ -15,6 +15,7 @@ import com.infamedavid.protoseq.core.midi.MidiEngine
 import com.infamedavid.protoseq.core.midi.NoOpMidiMessageSender
 import com.infamedavid.protoseq.core.repeater.RepeaterEngine
 import com.infamedavid.protoseq.core.repeater.RptrMidiOut
+import com.infamedavid.protoseq.core.repeater.RptrState
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
@@ -71,6 +72,7 @@ class TransportViewModel(
             clockEngine.ticks.collect { tick ->
                 val repeaterTickResult = repeaterEngine.onTick(tick)
                 sendRepeaterMidi(repeaterTickResult.midi)
+                syncRptrUiState()
                 processDueNoteOffs(tick)
                 if (isSequencerStepTick(tick)) {
                     advanceSequencer(tick)
@@ -115,6 +117,7 @@ class TransportViewModel(
                 clearCcSlewState()
                 sequencerEngine.reset()
                 repeaterEngine.reset()
+                syncRptrUiState()
                 clockEngine.playFromStart()
                 midiEngine.sendStart()
             }
@@ -134,6 +137,7 @@ class TransportViewModel(
             TransportState.Paused -> {
                 val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
                 sendRepeaterMidi(stopResult.midi)
+                syncRptrUiState()
                 sendAndClearPendingNoteOffs()
                 clearCcSlewState()
                 clockEngine.stop()
@@ -148,6 +152,7 @@ class TransportViewModel(
         if (clockEngine.getTransportState() == TransportState.Playing) {
             val pauseResult = repeaterEngine.onTransportPause(currentTick = 0L)
             sendRepeaterMidi(pauseResult.midi)
+            syncRptrUiState()
             sendAndClearPendingNoteOffs()
             clockEngine.pause()
         }
@@ -302,9 +307,24 @@ class TransportViewModel(
         scheduledNoteOffs.clear()
     }
 
+    private fun syncRptrUiState() {
+        val (rptrState, activeRptrDivision) = when (val state = repeaterEngine.getState()) {
+            is RptrState.Idle -> RptrUiRuntimeState.Idle to null
+            is RptrState.Wait -> RptrUiRuntimeState.Wait to state.division
+            is RptrState.Record -> RptrUiRuntimeState.Record to state.division
+            is RptrState.Loop -> RptrUiRuntimeState.Loop to state.division
+            is RptrState.Release -> RptrUiRuntimeState.Idle to null
+        }
+        _uiState.value = _uiState.value.copy(
+            rptrState = rptrState,
+            activeRptrDivision = activeRptrDivision
+        )
+    }
+
     override fun onCleared() {
         val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
         sendRepeaterMidi(stopResult.midi)
+        syncRptrUiState()
         sendAndClearPendingNoteOffs()
         midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
