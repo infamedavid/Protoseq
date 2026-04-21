@@ -44,9 +44,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
+import com.infamedavid.protoseq.core.repeater.RptrDivision
+import com.infamedavid.protoseq.core.repeater.RptrStartMode
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
 import com.infamedavid.protoseq.features.stochastic.toConfig
+import com.infamedavid.protoseq.ui.components.ProtoMomentaryButton
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
@@ -359,6 +362,135 @@ fun AppScreen(
                             onIncrement = {
                                 stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
                             }
+                        )
+                    }
+                }
+
+                val rptrControlsEnabled = stochasticState.outputMode != MidiOutputMode.CC
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "RPTR BASE",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedButton(
+                                onClick = stochasticViewModel::decrementRptrBaseUnits,
+                                modifier = Modifier
+                                    .weight(0.8f)
+                                    .height(48.dp),
+                                enabled = rptrControlsEnabled,
+                                shape = ProtoControlShape
+                            ) {
+                                Text(text = "-")
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .weight(2f)
+                                    .height(48.dp)
+                                    .padding(horizontal = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = stochasticState.rptrBaseUnits.toString(),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.secondary
+                                )
+                            }
+
+                            OutlinedButton(
+                                onClick = stochasticViewModel::incrementRptrBaseUnits,
+                                modifier = Modifier
+                                    .weight(0.8f)
+                                    .height(48.dp),
+                                enabled = rptrControlsEnabled,
+                                shape = ProtoControlShape
+                            ) {
+                                Text(text = "+")
+                            }
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "RPTR MODE",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    stochasticViewModel.setRptrStartMode(RptrStartMode.FREE)
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = rptrControlsEnabled &&
+                                        stochasticState.rptrStartMode != RptrStartMode.FREE,
+                                shape = ProtoControlShape
+                            ) {
+                                Text(text = "FREE")
+                            }
+
+                            OutlinedButton(
+                                onClick = {
+                                    stochasticViewModel.setRptrStartMode(RptrStartMode.GRID)
+                                },
+                                modifier = Modifier.weight(1f),
+                                enabled = rptrControlsEnabled &&
+                                        stochasticState.rptrStartMode != RptrStartMode.GRID,
+                                shape = ProtoControlShape
+                            ) {
+                                Text(text = "GRID")
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val divisions = listOf(
+                        "1/2" to RptrDivision.D2,
+                        "1/4" to RptrDivision.D4,
+                        "1/8" to RptrDivision.D8,
+                        "1/16" to RptrDivision.D16,
+                        "1/32" to RptrDivision.D32
+                    )
+
+                    divisions.forEach { (label, division) ->
+                        ProtoMomentaryButton(
+                            label = label,
+                            isActive = transportState.activeRptrDivision == division,
+                            onPress = {
+                                transportViewModel.pressRptr(division, stochasticState.toConfig())
+                            },
+                            onRelease = {
+                                transportViewModel.releaseRptr()
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = rptrControlsEnabled
                         )
                     }
                 }
