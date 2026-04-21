@@ -1,6 +1,7 @@
 package com.infamedavid.protoseq.features.stochastic
 
 import com.infamedavid.protoseq.core.music.QuantizationMode
+import com.infamedavid.protoseq.core.repeater.RptrStartMode
 
 data class StochasticSequencerUiState(
     val sequenceLength: Int = 16,
@@ -15,5 +16,7 @@ data class StochasticSequencerUiState(
     val pitchOffset: Int = 0,
     val gateLength: Float = 0.45f,
     val randomGateLength: Float = 0.20f,
-    val bernoulliProbability: Float = 0.00f
+    val bernoulliProbability: Float = 0.00f,
+    val rptrBaseUnits: Int = 1,
+    val rptrStartMode: RptrStartMode = RptrStartMode.FREE
 )

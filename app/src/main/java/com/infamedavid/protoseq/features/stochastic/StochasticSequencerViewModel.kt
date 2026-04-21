@@ -2,6 +2,7 @@ package com.infamedavid.protoseq.features.stochastic
 
 import androidx.lifecycle.ViewModel
 import com.infamedavid.protoseq.core.music.QuantizationMode
+import com.infamedavid.protoseq.core.repeater.RptrStartMode
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,5 +93,21 @@ class StochasticSequencerViewModel : ViewModel() {
 
     fun setBernoulliProbability(probability: Float) {
         _uiState.value = _uiState.value.copy(bernoulliProbability = probability.coerceIn(0f, 1f))
+    }
+
+    fun setRptrBaseUnits(value: Int) {
+        _uiState.value = _uiState.value.copy(rptrBaseUnits = value.coerceAtLeast(1))
+    }
+
+    fun incrementRptrBaseUnits() {
+        _uiState.value = _uiState.value.copy(rptrBaseUnits = _uiState.value.rptrBaseUnits + 1)
+    }
+
+    fun decrementRptrBaseUnits() {
+        _uiState.value = _uiState.value.copy(rptrBaseUnits = (_uiState.value.rptrBaseUnits - 1).coerceAtLeast(1))
+    }
+
+    fun setRptrStartMode(mode: RptrStartMode) {
+        _uiState.value = _uiState.value.copy(rptrStartMode = mode)
     }
 }

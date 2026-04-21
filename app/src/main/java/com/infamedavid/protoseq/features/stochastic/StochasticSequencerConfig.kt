@@ -1,6 +1,7 @@
 package com.infamedavid.protoseq.features.stochastic
 
 import com.infamedavid.protoseq.core.music.QuantizationMode
+import com.infamedavid.protoseq.core.repeater.RptrStartMode
 
 data class StochasticSequencerConfig(
     val sequenceLength: Int,
@@ -16,6 +17,8 @@ data class StochasticSequencerConfig(
     val gateLength: Float,
     val randomGateLength: Float,
     val bernoulliProbability: Float,
+    val rptrBaseUnits: Int,
+    val rptrStartMode: RptrStartMode,
 ) {
     fun sanitized(registerSize: Int = 64): StochasticSequencerConfig {
         return copy(
@@ -29,7 +32,8 @@ data class StochasticSequencerConfig(
             pitchOffset = pitchOffset.coerceIn(-24, 24),
             gateLength = gateLength.coerceIn(0f, 1f),
             randomGateLength = randomGateLength.coerceIn(0f, 1f),
-            bernoulliProbability = bernoulliProbability.coerceIn(0f, 1f)
+            bernoulliProbability = bernoulliProbability.coerceIn(0f, 1f),
+            rptrBaseUnits = rptrBaseUnits.coerceAtLeast(1)
         )
     }
 }
@@ -48,6 +52,8 @@ fun StochasticSequencerUiState.toConfig(): StochasticSequencerConfig {
         pitchOffset = pitchOffset,
         gateLength = gateLength,
         randomGateLength = randomGateLength,
-        bernoulliProbability = bernoulliProbability
+        bernoulliProbability = bernoulliProbability,
+        rptrBaseUnits = rptrBaseUnits,
+        rptrStartMode = rptrStartMode
     )
 }
