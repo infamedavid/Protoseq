@@ -14,6 +14,8 @@ import com.infamedavid.protoseq.core.midi.MidiDeviceRepository
 import com.infamedavid.protoseq.core.midi.MidiEngine
 import com.infamedavid.protoseq.core.midi.NoOpMidiMessageSender
 import com.infamedavid.protoseq.core.repeater.RepeaterEngine
+import com.infamedavid.protoseq.core.repeater.RptrConfig
+import com.infamedavid.protoseq.core.repeater.RptrDivision
 import com.infamedavid.protoseq.core.repeater.RptrMidiOut
 import com.infamedavid.protoseq.core.repeater.RptrState
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
@@ -45,6 +47,7 @@ class TransportViewModel(
     private val scheduledNoteOffs = mutableListOf<ScheduledNoteOff>()
     private var lastSentCcValue: Int? = null
     private var activeCcSlew: ActiveCcSlew? = null
+    private var latestClockTick: Long = 1L
 
     private val _uiState = MutableStateFlow(
         TransportUiState(
@@ -70,6 +73,7 @@ class TransportViewModel(
 
         vmScope.launch {
             clockEngine.ticks.collect { tick ->
+                latestClockTick = tick
                 val repeaterTickResult = repeaterEngine.onTick(tick)
                 sendRepeaterMidi(repeaterTickResult.midi)
                 syncRptrUiState()
@@ -160,6 +164,25 @@ class TransportViewModel(
 
     fun updateSequencerConfig(config: StochasticSequencerConfig) {
         sequencerConfig = config.sanitized()
+    }
+
+    fun pressRptr(division: RptrDivision, config: StochasticSequencerConfig) {
+        val rptrConfig = RptrConfig(
+            baseUnits = config.rptrBaseUnits,
+            startMode = config.rptrStartMode
+        )
+        repeaterEngine.press(
+            division = division,
+            config = rptrConfig,
+            currentTick = latestClockTick
+        )
+        syncRptrUiState()
+    }
+
+    fun releaseRptr() {
+        val releaseResult = repeaterEngine.release(currentTick = latestClockTick)
+        sendRepeaterMidi(releaseResult.midi)
+        syncRptrUiState()
     }
 
     private fun isSequencerStepTick(tick: Long): Boolean = ((tick - 1L) % TICKS_PER_STEP) == 0L
