@@ -8,9 +8,13 @@ import androidx.lifecycle.viewmodel.CreationExtras
 import com.infamedavid.protoseq.core.clock.ClockEngine
 import com.infamedavid.protoseq.core.clock.TransportState
 import com.infamedavid.protoseq.core.midi.AndroidMidiMessageSender
+import com.infamedavid.protoseq.core.repeater.MidiNoteOffEvent
+import com.infamedavid.protoseq.core.repeater.MidiNoteOnEvent
 import com.infamedavid.protoseq.core.midi.MidiDeviceRepository
 import com.infamedavid.protoseq.core.midi.MidiEngine
 import com.infamedavid.protoseq.core.midi.NoOpMidiMessageSender
+import com.infamedavid.protoseq.core.repeater.RepeaterEngine
+import com.infamedavid.protoseq.core.repeater.RptrMidiOut
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
@@ -35,6 +39,7 @@ class TransportViewModel(
 ) : ViewModel() {
     private val vmScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val sequencerEngine = StochasticSequencerEngine()
+    private val repeaterEngine = RepeaterEngine()
     private var sequencerConfig: StochasticSequencerConfig = StochasticSequencerUiState().toConfig()
     private val scheduledNoteOffs = mutableListOf<ScheduledNoteOff>()
     private var lastSentCcValue: Int? = null
@@ -64,6 +69,8 @@ class TransportViewModel(
 
         vmScope.launch {
             clockEngine.ticks.collect { tick ->
+                val repeaterTickResult = repeaterEngine.onTick(tick)
+                sendRepeaterMidi(repeaterTickResult.midi)
                 processDueNoteOffs(tick)
                 if (isSequencerStepTick(tick)) {
                     advanceSequencer(tick)
@@ -107,6 +114,7 @@ class TransportViewModel(
                 sendAndClearPendingNoteOffs()
                 clearCcSlewState()
                 sequencerEngine.reset()
+                repeaterEngine.reset()
                 clockEngine.playFromStart()
                 midiEngine.sendStart()
             }
@@ -124,6 +132,8 @@ class TransportViewModel(
         when (clockEngine.getTransportState()) {
             TransportState.Playing,
             TransportState.Paused -> {
+                val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
+                sendRepeaterMidi(stopResult.midi)
                 sendAndClearPendingNoteOffs()
                 clearCcSlewState()
                 clockEngine.stop()
@@ -136,6 +146,8 @@ class TransportViewModel(
 
     fun pause() {
         if (clockEngine.getTransportState() == TransportState.Playing) {
+            val pauseResult = repeaterEngine.onTransportPause(currentTick = 0L)
+            sendRepeaterMidi(pauseResult.midi)
             sendAndClearPendingNoteOffs()
             clockEngine.pause()
         }
@@ -152,10 +164,20 @@ class TransportViewModel(
         while (iterator.hasNext()) {
             val scheduled = iterator.next()
             if (scheduled.dueTick == currentTick) {
-                midiEngine.sendNoteOff(
-                    channel = scheduled.channel,
-                    note = scheduled.note
+                val routeResult = repeaterEngine.onLiveNoteOff(
+                    MidiNoteOffEvent(
+                        tick = currentTick,
+                        channel = scheduled.channel,
+                        note = scheduled.note
+                    )
                 )
+                sendRepeaterMidi(routeResult.extraMidi)
+                if (routeResult.passThrough) {
+                    midiEngine.sendNoteOff(
+                        channel = scheduled.channel,
+                        note = scheduled.note
+                    )
+                }
                 iterator.remove()
             }
         }
@@ -168,15 +190,27 @@ class TransportViewModel(
                 val note = output.note ?: return
                 if (!output.gate || !output.trigger) return
 
-                midiEngine.sendNoteOn(
-                    channel = sequencerConfig.midiChannel,
-                    note = note
+                val routeResult = repeaterEngine.onLiveNoteOn(
+                    MidiNoteOnEvent(
+                        tick = currentTick,
+                        channel = sequencerConfig.midiChannel,
+                        note = note,
+                        velocity = 100
+                    )
                 )
-                scheduledNoteOffs += ScheduledNoteOff(
-                    dueTick = currentTick + output.gateLengthTicks,
-                    channel = sequencerConfig.midiChannel,
-                    note = note
-                )
+                sendRepeaterMidi(routeResult.extraMidi)
+                if (routeResult.passThrough) {
+                    midiEngine.sendNoteOn(
+                        channel = sequencerConfig.midiChannel,
+                        note = note,
+                        velocity = 100
+                    )
+                    scheduledNoteOffs += ScheduledNoteOff(
+                        dueTick = currentTick + output.gateLengthTicks,
+                        channel = sequencerConfig.midiChannel,
+                        note = note
+                    )
+                }
             }
 
             MidiOutputMode.CC -> {
@@ -244,6 +278,23 @@ class TransportViewModel(
         activeCcSlew = null
     }
 
+    private fun sendRepeaterMidi(messages: List<RptrMidiOut>) {
+        messages.forEach { message ->
+            when (message) {
+                is RptrMidiOut.NoteOn -> midiEngine.sendNoteOn(
+                    channel = message.channel,
+                    note = message.note,
+                    velocity = message.velocity
+                )
+
+                is RptrMidiOut.NoteOff -> midiEngine.sendNoteOff(
+                    channel = message.channel,
+                    note = message.note
+                )
+            }
+        }
+    }
+
     private fun sendAndClearPendingNoteOffs() {
         scheduledNoteOffs.forEach { scheduled ->
             midiEngine.sendNoteOff(channel = scheduled.channel, note = scheduled.note)
@@ -252,6 +303,8 @@ class TransportViewModel(
     }
 
     override fun onCleared() {
+        val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
+        sendRepeaterMidi(stopResult.midi)
         sendAndClearPendingNoteOffs()
         midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
