@@ -69,7 +69,8 @@ class TransportViewModel(
 
         vmScope.launch {
             clockEngine.ticks.collect { tick ->
-                sendRepeaterMidi(repeaterEngine.onTick(tick))
+                val repeaterTickResult = repeaterEngine.onTick(tick)
+                sendRepeaterMidi(repeaterTickResult.midi)
                 processDueNoteOffs(tick)
                 if (isSequencerStepTick(tick)) {
                     advanceSequencer(tick)
@@ -131,7 +132,8 @@ class TransportViewModel(
         when (clockEngine.getTransportState()) {
             TransportState.Playing,
             TransportState.Paused -> {
-                sendRepeaterMidi(repeaterEngine.onTransportStop(currentTick = 0L))
+                val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
+                sendRepeaterMidi(stopResult.midi)
                 sendAndClearPendingNoteOffs()
                 clearCcSlewState()
                 clockEngine.stop()
@@ -144,7 +146,8 @@ class TransportViewModel(
 
     fun pause() {
         if (clockEngine.getTransportState() == TransportState.Playing) {
-            sendRepeaterMidi(repeaterEngine.onTransportPause(currentTick = 0L))
+            val pauseResult = repeaterEngine.onTransportPause(currentTick = 0L)
+            sendRepeaterMidi(pauseResult.midi)
             sendAndClearPendingNoteOffs()
             clockEngine.pause()
         }
@@ -300,7 +303,8 @@ class TransportViewModel(
     }
 
     override fun onCleared() {
-        sendRepeaterMidi(repeaterEngine.onTransportStop(currentTick = 0L))
+        val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
+        sendRepeaterMidi(stopResult.midi)
         sendAndClearPendingNoteOffs()
         midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
