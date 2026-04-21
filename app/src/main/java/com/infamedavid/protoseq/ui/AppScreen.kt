@@ -93,6 +93,7 @@ fun AppScreen(
     var bpmInputText by rememberSaveable { mutableStateOf("") }
     var showQuantizationDialog by rememberSaveable { mutableStateOf(false) }
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
+    var showRptrBasePickerDialog by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(stochasticState) {
         transportViewModel.updateSequencerConfig(stochasticState.toConfig())
@@ -371,6 +372,14 @@ fun AppScreen(
                 val rptrBlockEnabled = stochasticState.outputMode != MidiOutputMode.CC
                 val rptrConfigControlsEnabled = rptrBlockEnabled && !rptrIsRuntimeActive
                 val rptrDivisionButtonsEnabled = rptrBlockEnabled
+                val rptrBaseQuickPickValues = listOf(
+                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 16, 17,
+                    19, 21, 23, 29, 31, 32, 37, 41, 43, 47, 53, 59, 61, 64
+                )
+
+                Spacer(modifier = Modifier.height(2.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -381,7 +390,7 @@ fun AppScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "RPTR BASE",
+                            text = "BASE",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -402,13 +411,13 @@ fun AppScreen(
                                 Text(text = "-")
                             }
 
-                            Row(
+                            OutlinedButton(
+                                onClick = { showRptrBasePickerDialog = true },
                                 modifier = Modifier
                                     .weight(2f)
-                                    .height(48.dp)
-                                    .padding(horizontal = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
+                                    .height(48.dp),
+                                enabled = rptrConfigControlsEnabled,
+                                shape = ProtoControlShape
                             ) {
                                 Text(
                                     text = stochasticState.rptrBaseUnits.toString(),
@@ -435,7 +444,7 @@ fun AppScreen(
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         Text(
-                            text = "RPTR MODE",
+                            text = "MODE",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -497,6 +506,47 @@ fun AppScreen(
                             enabled = rptrDivisionButtonsEnabled
                         )
                     }
+                }
+
+                if (showRptrBasePickerDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showRptrBasePickerDialog = false },
+                        title = { Text(text = "Select BASE") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                rptrBaseQuickPickValues.chunked(5).forEach { rowValues ->
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        rowValues.forEach { value ->
+                                            OutlinedButton(
+                                                onClick = {
+                                                    stochasticViewModel.setRptrBaseUnits(value)
+                                                    showRptrBasePickerDialog = false
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                shape = ProtoControlShape
+                                            ) {
+                                                val prefix =
+                                                    if (value == stochasticState.rptrBaseUnits) "✓ " else ""
+                                                Text(text = "$prefix$value")
+                                            }
+                                        }
+                                        repeat(5 - rowValues.size) {
+                                            Spacer(modifier = Modifier.weight(1f))
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {},
+                        dismissButton = {
+                            TextButton(onClick = { showRptrBasePickerDialog = false }) {
+                                Text("Cancel")
+                            }
+                        }
+                    )
                 }
             }
 
