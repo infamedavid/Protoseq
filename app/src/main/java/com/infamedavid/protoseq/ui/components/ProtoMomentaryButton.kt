@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,6 +28,9 @@ fun ProtoMomentaryButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
+    val currentOnPress by rememberUpdatedState(onPress)
+    val currentOnRelease by rememberUpdatedState(onRelease)
+
     val containerColor = when {
         !enabled -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         isActive -> MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
@@ -43,14 +48,14 @@ fun ProtoMomentaryButton(
     }
 
     val gestureModifier = if (enabled) {
-        Modifier.pointerInput(onPress, onRelease) {
+        Modifier.pointerInput(enabled) {
             detectTapGestures(
                 onPress = {
-                    onPress()
+                    currentOnPress()
                     try {
                         tryAwaitRelease()
                     } finally {
-                        onRelease()
+                        currentOnRelease()
                     }
                 }
             )
