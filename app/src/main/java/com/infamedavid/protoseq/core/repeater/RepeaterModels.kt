@@ -1,5 +1,7 @@
 package com.infamedavid.protoseq.core.repeater
 
+import java.util.ArrayDeque
+
 enum class RptrStartMode {
     FREE,
     GRID,

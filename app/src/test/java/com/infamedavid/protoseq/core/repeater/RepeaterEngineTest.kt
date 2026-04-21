@@ -16,7 +16,13 @@ class RepeaterEngineTest {
         engine.onLiveNoteOff(MidiNoteOffEvent(tick = 5, channel = 1, note = 60))
 
         val closeResult = engine.onTick(currentTick = 25)
-        assertTrue(closeResult.midi.isEmpty())
+        assertEquals(
+            listOf(
+                RptrMidiOut.NoteOff(channel = 1, note = 60),
+                RptrMidiOut.NoteOn(channel = 1, note = 60, velocity = 100),
+            ),
+            closeResult.midi,
+        )
 
         val buffer = engine.getBufferSnapshotOrNull()
         requireNotNull(buffer)
@@ -25,15 +31,6 @@ class RepeaterEngineTest {
         assertEquals(0, buffer.notes[0].startOffsetTicks)
         assertEquals(4, buffer.notes[0].endOffsetTicks)
         assertTrue(engine.getState() is RptrState.Loop)
-
-        val startTickMidi = engine.onTick(currentTick = 25).midi
-        assertEquals(
-            listOf(
-                RptrMidiOut.NoteOff(channel = 1, note = 60),
-                RptrMidiOut.NoteOn(channel = 1, note = 60, velocity = 100),
-            ),
-            startTickMidi,
-        )
 
         val endTickMidi = engine.onTick(currentTick = 29).midi
         assertEquals(listOf(RptrMidiOut.NoteOff(channel = 1, note = 60)), endTickMidi)
@@ -89,8 +86,6 @@ class RepeaterEngineTest {
         engine.press(RptrDivision.D16, RptrConfig(baseUnits = 1, startMode = RptrStartMode.FREE), currentTick = 1)
         engine.onLiveNoteOn(MidiNoteOnEvent(tick = 1, channel = 1, note = 60, velocity = 100))
         engine.onLiveNoteOff(MidiNoteOffEvent(tick = 5, channel = 1, note = 60))
-        engine.onTick(currentTick = 25)
-
         engine.onTick(currentTick = 25)
         val releaseResult = engine.release(currentTick = 26)
 
@@ -149,12 +144,45 @@ class RepeaterEngineTest {
         engine.onLiveNoteOn(MidiNoteOnEvent(tick = 1, channel = 1, note = 60, velocity = 100))
         engine.onLiveNoteOff(MidiNoteOffEvent(tick = 5, channel = 1, note = 60))
         engine.onTick(currentTick = 25)
-        engine.onTick(currentTick = 25)
 
         val stopResult = engine.onTransportStop(currentTick = 26)
 
         assertEquals(listOf(RptrMidiOut.NoteOff(channel = 1, note = 60)), stopResult.midi)
         assertEquals(RptrState.Idle, engine.getState())
         assertEquals(null, engine.getBufferSnapshotOrNull())
+    }
+
+    @Test
+    fun loopStartIsRenderedOnRecordCloseWithMonotonicTicks() {
+        val engine = RepeaterEngine()
+        engine.press(RptrDivision.D16, RptrConfig(baseUnits = 1, startMode = RptrStartMode.FREE), currentTick = 1)
+        engine.onLiveNoteOn(MidiNoteOnEvent(tick = 1, channel = 3, note = 70, velocity = 110))
+        engine.onLiveNoteOff(MidiNoteOffEvent(tick = 4, channel = 3, note = 70))
+
+        val loopEntry = engine.onTick(currentTick = 25)
+        assertEquals(
+            listOf(
+                RptrMidiOut.NoteOff(channel = 3, note = 70),
+                RptrMidiOut.NoteOn(channel = 3, note = 70, velocity = 110),
+            ),
+            loopEntry.midi,
+        )
+
+        val nextTick = engine.onTick(currentTick = 26)
+        assertTrue(nextTick.midi.isEmpty())
+    }
+
+    @Test
+    fun loopStartupDoesNotProduceOrphanLoopNoteOff() {
+        val engine = RepeaterEngine()
+        engine.press(RptrDivision.D16, RptrConfig(baseUnits = 1, startMode = RptrStartMode.FREE), currentTick = 1)
+        engine.onLiveNoteOn(MidiNoteOnEvent(tick = 1, channel = 4, note = 72, velocity = 100))
+        engine.onLiveNoteOff(MidiNoteOffEvent(tick = 5, channel = 4, note = 72))
+
+        val loopEntry = engine.onTick(currentTick = 25)
+        assertTrue(loopEntry.midi.contains(RptrMidiOut.NoteOn(channel = 4, note = 72, velocity = 100)))
+
+        val firstCycleOff = engine.onTick(currentTick = 29).midi
+        assertEquals(listOf(RptrMidiOut.NoteOff(channel = 4, note = 72)), firstCycleOff)
     }
 }

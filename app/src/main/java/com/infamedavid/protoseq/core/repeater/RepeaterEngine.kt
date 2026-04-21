@@ -1,5 +1,7 @@
 package com.infamedavid.protoseq.core.repeater
 
+import java.util.ArrayDeque
+
 class RepeaterEngine {
     private var state: RptrState = RptrState.Idle
     private var bufferSnapshot: RptrBuffer? = null
@@ -70,7 +72,7 @@ class RepeaterEngine {
                     current.capturedOns.add(capture)
                     val key = NoteKey(channel = event.channel, note = event.note)
                     val queue = current.openByKey.getOrPut(key) { ArrayDeque() }
-                    queue.addLast(capture.id)
+                    queue.offerLast(capture.id)
                 }
                 LiveRouteResult(passThrough = true)
             }
@@ -90,9 +92,9 @@ class RepeaterEngine {
             is RptrState.Record -> {
                 val key = NoteKey(channel = event.channel, note = event.note)
                 val queue = current.openByKey[key]
-                val captureId = queue?.removeFirstOrNull()
+                val captureId = queue?.pollFirst()
                 if (captureId != null) {
-                    if (queue.isEmpty()) {
+                    if (queue != null && queue.isEmpty()) {
                         current.openByKey.remove(key)
                     }
                     val endOffsetTicks =
@@ -133,43 +135,14 @@ class RepeaterEngine {
                         buffer = compileResult.buffer,
                         loopStartTick = current.recordEndTickExclusive,
                     )
-                    TickResult(midi = compileResult.cleanupMidi)
+                    val loopMidi = renderLoopTick(state as RptrState.Loop, currentTick)
+                    TickResult(midi = compileResult.cleanupMidi + loopMidi)
                 } else {
                     TickResult()
                 }
             }
 
-            is RptrState.Loop -> {
-                val buffer = current.buffer
-                if (buffer.notes.isEmpty()) {
-                    return TickResult()
-                }
-
-                val cycleElapsed = currentTick - current.loopStartTick
-                val offset = (cycleElapsed % buffer.windowTicks).toInt()
-                val midi = mutableListOf<RptrMidiOut>()
-
-                if (cycleElapsed > 0 && offset == 0) {
-                    midi += clearActiveLoopNotes(current.activeLoopNotes)
-                }
-
-                for (note in buffer.notes) {
-                    if (note.endOffsetTicks == offset) {
-                        midi += RptrMidiOut.NoteOff(channel = note.channel, note = note.note)
-                        current.activeLoopNotes.remove(NoteKey(channel = note.channel, note = note.note))
-                    }
-                }
-
-                for (note in buffer.notes) {
-                    if (note.startOffsetTicks == offset) {
-                        midi += RptrMidiOut.NoteOff(channel = note.channel, note = note.note)
-                        midi += RptrMidiOut.NoteOn(channel = note.channel, note = note.note, velocity = note.velocity)
-                        current.activeLoopNotes.add(NoteKey(channel = note.channel, note = note.note))
-                    }
-                }
-
-                TickResult(midi = midi)
-            }
+            is RptrState.Loop -> TickResult(midi = renderLoopTick(current, currentTick))
         }
     }
 
@@ -274,6 +247,38 @@ class RepeaterEngine {
         val midi = activeLoopNotes
             .map { key -> RptrMidiOut.NoteOff(channel = key.channel, note = key.note) }
         activeLoopNotes.clear()
+        return midi
+    }
+
+    private fun renderLoopTick(loop: RptrState.Loop, currentTick: Long): List<RptrMidiOut> {
+        val buffer = loop.buffer
+        if (buffer.notes.isEmpty()) {
+            return emptyList()
+        }
+
+        val cycleElapsed = currentTick - loop.loopStartTick
+        val offset = (cycleElapsed % buffer.windowTicks).toInt()
+        val midi = mutableListOf<RptrMidiOut>()
+
+        if (cycleElapsed > 0 && offset == 0) {
+            midi += clearActiveLoopNotes(loop.activeLoopNotes)
+        }
+
+        for (note in buffer.notes) {
+            if (note.endOffsetTicks == offset) {
+                midi += RptrMidiOut.NoteOff(channel = note.channel, note = note.note)
+                loop.activeLoopNotes.remove(NoteKey(channel = note.channel, note = note.note))
+            }
+        }
+
+        for (note in buffer.notes) {
+            if (note.startOffsetTicks == offset) {
+                midi += RptrMidiOut.NoteOff(channel = note.channel, note = note.note)
+                midi += RptrMidiOut.NoteOn(channel = note.channel, note = note.note, velocity = note.velocity)
+                loop.activeLoopNotes.add(NoteKey(channel = note.channel, note = note.note))
+            }
+        }
+
         return midi
     }
 }
