@@ -19,7 +19,3 @@ Protoseq can generate random MIDI note sequences with lock control, allowing pat
 - Gate length control
 - Random gate length
 - Sequence modifier inspired by the Repeater effect in Renoise
-
-## About this release
-
-This version focuses on the Turing Machine sequencing concept as the starting point for Protoseq.
