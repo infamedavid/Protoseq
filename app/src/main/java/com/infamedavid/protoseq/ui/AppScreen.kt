@@ -97,7 +97,10 @@ fun AppScreen(
     var sessionState by remember {
         mutableStateOf(
             createDefaultProtoseqSessionState().updatePage(pageIndex = 0) { page ->
-                page.withSequencerType(SequencerType.TURING_MACHINE)
+                page.copy(
+                    selectedSequencerType = SequencerType.TURING_MACHINE,
+                    enabled = true
+                )
             }
         )
     }
@@ -114,7 +117,9 @@ fun AppScreen(
 
     val turingPageConfigs = remember(sessionState.pages) {
         sessionState.pages
-            .filter { it.selectedSequencerType == SequencerType.TURING_MACHINE }
+            .filter {
+                it.selectedSequencerType == SequencerType.TURING_MACHINE && it.enabled
+            }
             .map { page ->
                 TuringPageConfig(
                     pageIndex = page.pageIndex,
@@ -263,10 +268,14 @@ fun AppScreen(
             )
             Spacer(modifier = Modifier.height(10.dp))
 
-            Text(
-                text = "Page ${currentPage.pageIndex + 1}",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface
+            PageHeader(
+                pageIndex = currentPage.pageIndex,
+                enabled = currentPage.enabled,
+                onToggleEnabled = {
+                    sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                        page.copy(enabled = !page.enabled)
+                    }
+                }
             )
             Spacer(modifier = Modifier.height(8.dp))
 
@@ -379,6 +388,10 @@ fun AppScreen(
                         rptrBaseUnits = currentTuringState.rptrBaseUnits,
                         rptrStartMode = currentTuringState.rptrStartMode,
                         showRptrBasePickerDialog = showRptrBasePickerDialog,
+                        pageRuntimeEnabled = (
+                            currentPage.enabled &&
+                                currentPage.selectedSequencerType == SequencerType.TURING_MACHINE
+                            ),
                         onShowRptrBasePickerDialogChange = { showRptrBasePickerDialog = it },
                         onDecrementRptrBaseUnits = {
                             updateCurrentTuringState {
@@ -655,6 +668,33 @@ private fun SequencerSelector(
             shape = ProtoControlShape
         ) {
             Text(text = "Reset Parameters")
+        }
+    }
+}
+
+@Composable
+private fun PageHeader(
+    pageIndex: Int,
+    enabled: Boolean,
+    onToggleEnabled: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(
+            text = "Page ${pageIndex + 1}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+
+        OutlinedButton(
+            onClick = onToggleEnabled,
+            shape = ProtoControlShape
+        ) {
+            Text(text = if (enabled) "ON" else "OFF")
         }
     }
 }
