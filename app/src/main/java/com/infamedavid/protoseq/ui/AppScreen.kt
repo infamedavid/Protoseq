@@ -282,6 +282,12 @@ fun AppScreen(
             SequencerSelector(
                 selectedSequencerType = currentPage.selectedSequencerType,
                 onSelectType = { selectedType ->
+                    if (
+                        selectedType == SequencerType.EMPTY &&
+                        currentPage.selectedSequencerType == SequencerType.TURING_MACHINE
+                    ) {
+                        transportViewModel.deactivatePageRuntime(currentPage.pageIndex)
+                    }
                     sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
                         page.withSequencerType(selectedType)
                     }
