@@ -54,8 +54,7 @@ import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
-import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
-import com.infamedavid.protoseq.ui.components.ProtoValueField
+import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
@@ -226,148 +225,44 @@ fun AppScreen(
 
             SectionDivider()
 
-            Column(
+            TuringMachinePanel(
+                lockPosition = stochasticState.lockPosition,
+                sequenceLength = stochasticState.sequenceLength,
+                slewAmount = stochasticState.slewAmount,
+                bernoulliProbability = stochasticState.bernoulliProbability,
+                pitchRangeSemitones = stochasticState.pitchRangeSemitones,
+                pitchOffset = stochasticState.pitchOffset,
+                gateLength = stochasticState.gateLength,
+                randomGateLength = stochasticState.randomGateLength,
+                onLockPositionChange = stochasticViewModel::setLockPosition,
+                onSequenceLengthChange = stochasticViewModel::setSequenceLength,
+                onSlewAmountChange = stochasticViewModel::setSlewAmount,
+                onBernoulliProbabilityChange = stochasticViewModel::setBernoulliProbability,
+                onPitchRangeSemitonesChange = stochasticViewModel::setPitchRangeSemitones,
+                onPitchOffsetChange = stochasticViewModel::setPitchOffset,
+                onGateLengthChange = stochasticViewModel::setGateLength,
+                onRandomGateLengthChange = stochasticViewModel::setRandomGateLength,
+                outputMode = stochasticState.outputMode,
+                midiChannel = stochasticState.midiChannel,
+                baseNoteDisplay = midiNoteToDisplay(stochasticState.baseNote),
+                quantizationDisplayName = stochasticState.quantizationMode.displayName,
+                ccNumber = stochasticState.ccNumber,
+                onOutputModeChange = stochasticViewModel::setOutputMode,
+                onDecrementMidiChannel = stochasticViewModel::decrementMidiChannel,
+                onIncrementMidiChannel = stochasticViewModel::incrementMidiChannel,
+                onDecrementBaseNote = stochasticViewModel::decrementBaseNote,
+                onIncrementBaseNote = stochasticViewModel::incrementBaseNote,
+                onQuantizationClick = { showQuantizationDialog = true },
+                onDecrementCcNumber = {
+                    stochasticViewModel.setCcNumber(stochasticState.ccNumber - 1)
+                },
+                onIncrementCcNumber = {
+                    stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(vertical = 12.dp)
             ) {
-                ProtoDualSliderRow(
-                    leftLabel = "LOCK",
-                    leftValue = stochasticState.lockPosition,
-                    leftValueText = "${(stochasticState.lockPosition * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setLockPosition,
-                    leftValueRange = -1f..1f,
-                    rightLabel = "SQLN",
-                    rightValue = (stochasticState.sequenceLength - 2) / 62f,
-                    rightValueText = stochasticState.sequenceLength.toString(),
-                    onRightValueChange = { normalized ->
-                        stochasticViewModel.setSequenceLength((2 + normalized * 62).toInt())
-                    }
-                )
-
-                ProtoDualSliderRow(
-                    leftLabel = "SLEW",
-                    leftValue = stochasticState.slewAmount,
-                    leftValueText = "${(stochasticState.slewAmount * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setSlewAmount,
-                    rightLabel = "BRNL",
-                    rightValue = stochasticState.bernoulliProbability,
-                    rightValueText = "${(stochasticState.bernoulliProbability * 100).toInt()}%",
-                    onRightValueChange = stochasticViewModel::setBernoulliProbability
-                )
-
-                val rangeSemitones = stochasticState.pitchRangeSemitones
-                val rangeOctaves = rangeSemitones / 12
-                val rangeRemainder = rangeSemitones % 12
-                val rangeDisplay = if (rangeRemainder == 0) {
-                    "$rangeOctaves OCT"
-                } else {
-                    "$rangeOctaves OCT + $rangeRemainder"
-                }
-
-                ProtoDualSliderRow(
-                    leftLabel = "RANG",
-                    leftValue = (rangeSemitones - 1) / 63f,
-                    leftValueText = rangeDisplay,
-                    onLeftValueChange = { normalized ->
-                        stochasticViewModel.setPitchRangeSemitones((1 + normalized * 63).toInt())
-                    },
-                    rightLabel = "OFST",
-                    rightValue = (stochasticState.pitchOffset + 24) / 48f,
-                    rightValueText = stochasticState.pitchOffset.toString(),
-                    onRightValueChange = { normalized ->
-                        stochasticViewModel.setPitchOffset((-24 + normalized * 48).toInt())
-                    }
-                )
-
-                ProtoDualSliderRow(
-                    leftLabel = "GLEN",
-                    leftValue = stochasticState.gateLength,
-                    leftValueText = "${(stochasticState.gateLength * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setGateLength,
-                    rightLabel = "RLEN",
-                    rightValue = stochasticState.randomGateLength,
-                    rightValueText = "${(stochasticState.randomGateLength * 100).toInt()}%",
-                    onRightValueChange = stochasticViewModel::setRandomGateLength
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "MODE",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.NOTE) },
-                                modifier = Modifier.weight(1f),
-                                enabled = stochasticState.outputMode != MidiOutputMode.NOTE,
-                                shape = ProtoControlShape
-                            ) {
-                                Text(text = "N")
-                            }
-
-                            OutlinedButton(
-                                onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.CC) },
-                                modifier = Modifier.weight(1f),
-                                enabled = stochasticState.outputMode != MidiOutputMode.CC,
-                                shape = ProtoControlShape
-                            ) {
-                                Text(text = "C")
-                            }
-                        }
-                    }
-
-                    ProtoValueField(
-                        label = "CHNL",
-                        value = stochasticState.midiChannel.toString(),
-                        modifier = Modifier.weight(1f),
-                        onDecrement = stochasticViewModel::decrementMidiChannel,
-                        onIncrement = stochasticViewModel::incrementMidiChannel
-                    )
-
-                    ProtoValueField(
-                        label = "BASE",
-                        value = midiNoteToDisplay(stochasticState.baseNote),
-                        modifier = Modifier.weight(1f),
-                        onDecrement = stochasticViewModel::decrementBaseNote,
-                        onIncrement = stochasticViewModel::incrementBaseNote
-                    )
-
-                    ProtoValueField(
-                        label = "QUAN",
-                        value = stochasticState.quantizationMode.displayName,
-                        modifier = Modifier.weight(1f),
-                        onClick = { showQuantizationDialog = true }
-                    )
-
-                    if (stochasticState.outputMode == MidiOutputMode.CC) {
-                        ProtoValueField(
-                            label = "CC#",
-                            value = stochasticState.ccNumber.toString(),
-                            modifier = Modifier.weight(1f),
-                            onDecrement = {
-                                stochasticViewModel.setCcNumber(stochasticState.ccNumber - 1)
-                            },
-                            onIncrement = {
-                                stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
-                            }
-                        )
-                    }
-                }
-
                 val rptrIsRuntimeActive = transportState.rptrState != RptrUiRuntimeState.Idle
                 val rptrBlockEnabled = stochasticState.outputMode != MidiOutputMode.CC
                 val rptrConfigControlsEnabled = rptrBlockEnabled && !rptrIsRuntimeActive
