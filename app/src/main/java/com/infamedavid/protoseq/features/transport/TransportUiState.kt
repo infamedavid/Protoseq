@@ -16,6 +16,6 @@ data class TransportUiState(
     val state: TransportState = TransportState.Stopped,
     val midiOutputTargets: List<MidiOutputTarget> = emptyList(),
     val selectedMidiOutputId: String? = null,
-    val rptrState: RptrUiRuntimeState = RptrUiRuntimeState.Idle,
-    val activeRptrDivision: RptrDivision? = null
+    val rptrStatesByPage: Map<Int, RptrUiRuntimeState> = emptyMap(),
+    val activeRptrDivisionsByPage: Map<Int, RptrDivision?> = emptyMap()
 )
