@@ -56,6 +56,7 @@ import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoValueField
+import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
@@ -226,12 +227,7 @@ fun AppScreen(
 
             SectionDivider()
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
+            TuringMachinePanel {
                 ProtoDualSliderRow(
                     leftLabel = "LOCK",
                     leftValue = stochasticState.lockPosition,
