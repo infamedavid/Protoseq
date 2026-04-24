@@ -194,16 +194,21 @@ class TransportViewModel(
 
                 val removedPageIndexes = activeTuringPageConfigs.keys - nextConfigsByPage.keys
                 removedPageIndexes.forEach { pageIndex ->
-                    pageRuntimes.remove(pageIndex)?.let { runtime ->
-                        val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = latestClockTick)
-                        sendRepeaterMidi(stopResult.midi)
-                        sendAndClearPendingNoteOffs(runtime)
-                        clearCcSlewState(runtime)
-                    }
+                    clearPageRuntimeLocked(pageIndex)
                 }
 
                 activeTuringPageConfigs.clear()
                 activeTuringPageConfigs.putAll(nextConfigsByPage)
+                syncRptrUiState()
+            }
+        }
+    }
+
+    fun deactivatePageRuntime(pageIndex: Int) {
+        vmScope.launch {
+            runtimeMutex.withLock {
+                activeTuringPageConfigs.remove(pageIndex)
+                clearPageRuntimeLocked(pageIndex)
                 syncRptrUiState()
             }
         }
@@ -403,6 +408,15 @@ class TransportViewModel(
             midiEngine.sendNoteOff(channel = scheduled.channel, note = scheduled.note)
         }
         runtime.scheduledNoteOffs.clear()
+    }
+
+    private fun clearPageRuntimeLocked(pageIndex: Int) {
+        pageRuntimes.remove(pageIndex)?.let { runtime ->
+            val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = latestClockTick)
+            sendRepeaterMidi(stopResult.midi)
+            sendAndClearPendingNoteOffs(runtime)
+            clearCcSlewState(runtime)
+        }
     }
 
     private fun syncRptrUiState() {
