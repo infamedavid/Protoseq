@@ -54,7 +54,6 @@ import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
-import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
@@ -243,86 +242,27 @@ fun AppScreen(
                 onPitchOffsetChange = stochasticViewModel::setPitchOffset,
                 onGateLengthChange = stochasticViewModel::setGateLength,
                 onRandomGateLengthChange = stochasticViewModel::setRandomGateLength,
+                outputMode = stochasticState.outputMode,
+                midiChannel = stochasticState.midiChannel,
+                baseNoteDisplay = midiNoteToDisplay(stochasticState.baseNote),
+                quantizationDisplayName = stochasticState.quantizationMode.displayName,
+                ccNumber = stochasticState.ccNumber,
+                onOutputModeChange = stochasticViewModel::setOutputMode,
+                onDecrementMidiChannel = stochasticViewModel::decrementMidiChannel,
+                onIncrementMidiChannel = stochasticViewModel::incrementMidiChannel,
+                onDecrementBaseNote = stochasticViewModel::decrementBaseNote,
+                onIncrementBaseNote = stochasticViewModel::incrementBaseNote,
+                onQuantizationClick = { showQuantizationDialog = true },
+                onDecrementCcNumber = {
+                    stochasticViewModel.setCcNumber(stochasticState.ccNumber - 1)
+                },
+                onIncrementCcNumber = {
+                    stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 12.dp)
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = "MODE",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.NOTE) },
-                                modifier = Modifier.weight(1f),
-                                enabled = stochasticState.outputMode != MidiOutputMode.NOTE,
-                                shape = ProtoControlShape
-                            ) {
-                                Text(text = "N")
-                            }
-
-                            OutlinedButton(
-                                onClick = { stochasticViewModel.setOutputMode(MidiOutputMode.CC) },
-                                modifier = Modifier.weight(1f),
-                                enabled = stochasticState.outputMode != MidiOutputMode.CC,
-                                shape = ProtoControlShape
-                            ) {
-                                Text(text = "C")
-                            }
-                        }
-                    }
-
-                    ProtoValueField(
-                        label = "CHNL",
-                        value = stochasticState.midiChannel.toString(),
-                        modifier = Modifier.weight(1f),
-                        onDecrement = stochasticViewModel::decrementMidiChannel,
-                        onIncrement = stochasticViewModel::incrementMidiChannel
-                    )
-
-                    ProtoValueField(
-                        label = "BASE",
-                        value = midiNoteToDisplay(stochasticState.baseNote),
-                        modifier = Modifier.weight(1f),
-                        onDecrement = stochasticViewModel::decrementBaseNote,
-                        onIncrement = stochasticViewModel::incrementBaseNote
-                    )
-
-                    ProtoValueField(
-                        label = "QUAN",
-                        value = stochasticState.quantizationMode.displayName,
-                        modifier = Modifier.weight(1f),
-                        onClick = { showQuantizationDialog = true }
-                    )
-
-                    if (stochasticState.outputMode == MidiOutputMode.CC) {
-                        ProtoValueField(
-                            label = "CC#",
-                            value = stochasticState.ccNumber.toString(),
-                            modifier = Modifier.weight(1f),
-                            onDecrement = {
-                                stochasticViewModel.setCcNumber(stochasticState.ccNumber - 1)
-                            },
-                            onIncrement = {
-                                stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
-                            }
-                        )
-                    }
-                }
-
                 val rptrIsRuntimeActive = transportState.rptrState != RptrUiRuntimeState.Idle
                 val rptrBlockEnabled = stochasticState.outputMode != MidiOutputMode.CC
                 val rptrConfigControlsEnabled = rptrBlockEnabled && !rptrIsRuntimeActive
