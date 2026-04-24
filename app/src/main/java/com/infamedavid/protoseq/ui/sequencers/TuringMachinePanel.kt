@@ -60,6 +60,7 @@ fun TuringMachinePanel(
     rptrBaseUnits: Int,
     rptrStartMode: RptrStartMode,
     showRptrBasePickerDialog: Boolean,
+    pageRuntimeEnabled: Boolean,
     onShowRptrBasePickerDialogChange: (Boolean) -> Unit,
     onDecrementRptrBaseUnits: () -> Unit,
     onIncrementRptrBaseUnits: () -> Unit,
@@ -113,6 +114,7 @@ fun TuringMachinePanel(
             rptrBaseUnits = rptrBaseUnits,
             rptrStartMode = rptrStartMode,
             showRptrBasePickerDialog = showRptrBasePickerDialog,
+            pageRuntimeEnabled = pageRuntimeEnabled,
             onShowRptrBasePickerDialogChange = onShowRptrBasePickerDialogChange,
             onDecrementRptrBaseUnits = onDecrementRptrBaseUnits,
             onIncrementRptrBaseUnits = onIncrementRptrBaseUnits,
@@ -300,6 +302,7 @@ private fun TuringMachineRepeaterControls(
     rptrBaseUnits: Int,
     rptrStartMode: RptrStartMode,
     showRptrBasePickerDialog: Boolean,
+    pageRuntimeEnabled: Boolean,
     onShowRptrBasePickerDialogChange: (Boolean) -> Unit,
     onDecrementRptrBaseUnits: () -> Unit,
     onIncrementRptrBaseUnits: () -> Unit,
@@ -308,7 +311,7 @@ private fun TuringMachineRepeaterControls(
     onPressRptr: (RptrDivision) -> Unit,
     onReleaseRptr: () -> Unit,
 ) {
-    val rptrBlockEnabled = outputMode != MidiOutputMode.CC
+    val rptrBlockEnabled = pageRuntimeEnabled && outputMode != MidiOutputMode.CC
     val rptrConfigControlsEnabled = rptrBlockEnabled && !rptrIsRuntimeActive
     val rptrDivisionButtonsEnabled = rptrBlockEnabled
     val rptrBaseQuickPickValues = listOf(
