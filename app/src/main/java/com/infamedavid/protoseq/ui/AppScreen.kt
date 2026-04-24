@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -44,7 +45,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
-import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
+import com.infamedavid.protoseq.features.sequencer.SequencerType
+import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionState
+import com.infamedavid.protoseq.features.sequencer.currentPage
+import com.infamedavid.protoseq.features.sequencer.selectPage
+import com.infamedavid.protoseq.features.sequencer.updatePage
+import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TransportViewModel
@@ -56,7 +62,6 @@ import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
 @Composable
 fun AppScreen(
-    stochasticViewModel: StochasticSequencerViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -82,16 +87,34 @@ fun AppScreen(
         factory = TransportViewModel.factory(context)
     )
     val transportState by transportViewModel.uiState.collectAsState()
-    val stochasticState by stochasticViewModel.uiState.collectAsState()
 
     var showBpmInputDialog by rememberSaveable { mutableStateOf(false) }
     var bpmInputText by rememberSaveable { mutableStateOf("") }
     var showQuantizationDialog by rememberSaveable { mutableStateOf(false) }
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
     var showRptrBasePickerDialog by rememberSaveable { mutableStateOf(false) }
+    var sessionState by remember {
+        mutableStateOf(
+            createDefaultProtoseqSessionState().updatePage(pageIndex = 0) { page ->
+                page.withSequencerType(SequencerType.TURING_MACHINE)
+            }
+        )
+    }
+    val currentPage = sessionState.currentPage()
+    val currentTuringState = currentPage.turingState
 
-    LaunchedEffect(stochasticState) {
-        transportViewModel.updateSequencerConfig(stochasticState.toConfig())
+    fun updateCurrentTuringState(
+        transform: (StochasticSequencerUiState) -> StochasticSequencerUiState
+    ) {
+        sessionState = sessionState.updatePage(sessionState.selectedPageIndex) { page ->
+            page.copy(turingState = transform(page.turingState))
+        }
+    }
+
+    LaunchedEffect(currentPage.selectedSequencerType, currentTuringState) {
+        if (currentPage.selectedSequencerType == SequencerType.TURING_MACHINE) {
+            transportViewModel.updateSequencerConfig(currentTuringState.toConfig())
+        }
     }
 
     Surface(
@@ -221,58 +244,155 @@ fun AppScreen(
 
             SectionDivider()
 
-            TuringMachinePanel(
-                lockPosition = stochasticState.lockPosition,
-                sequenceLength = stochasticState.sequenceLength,
-                slewAmount = stochasticState.slewAmount,
-                bernoulliProbability = stochasticState.bernoulliProbability,
-                pitchRangeSemitones = stochasticState.pitchRangeSemitones,
-                pitchOffset = stochasticState.pitchOffset,
-                gateLength = stochasticState.gateLength,
-                randomGateLength = stochasticState.randomGateLength,
-                onLockPositionChange = stochasticViewModel::setLockPosition,
-                onSequenceLengthChange = stochasticViewModel::setSequenceLength,
-                onSlewAmountChange = stochasticViewModel::setSlewAmount,
-                onBernoulliProbabilityChange = stochasticViewModel::setBernoulliProbability,
-                onPitchRangeSemitonesChange = stochasticViewModel::setPitchRangeSemitones,
-                onPitchOffsetChange = stochasticViewModel::setPitchOffset,
-                onGateLengthChange = stochasticViewModel::setGateLength,
-                onRandomGateLengthChange = stochasticViewModel::setRandomGateLength,
-                outputMode = stochasticState.outputMode,
-                midiChannel = stochasticState.midiChannel,
-                baseNoteDisplay = midiNoteToDisplay(stochasticState.baseNote),
-                quantizationDisplayName = stochasticState.quantizationMode.displayName,
-                ccNumber = stochasticState.ccNumber,
-                onOutputModeChange = stochasticViewModel::setOutputMode,
-                onDecrementMidiChannel = stochasticViewModel::decrementMidiChannel,
-                onIncrementMidiChannel = stochasticViewModel::incrementMidiChannel,
-                onDecrementBaseNote = stochasticViewModel::decrementBaseNote,
-                onIncrementBaseNote = stochasticViewModel::incrementBaseNote,
-                onQuantizationClick = { showQuantizationDialog = true },
-                onDecrementCcNumber = {
-                    stochasticViewModel.setCcNumber(stochasticState.ccNumber - 1)
+            PageTabs(
+                selectedPageIndex = sessionState.selectedPageIndex,
+                onSelectPage = { pageIndex ->
+                    sessionState = sessionState.selectPage(pageIndex)
                 },
-                onIncrementCcNumber = {
-                    stochasticViewModel.setCcNumber(stochasticState.ccNumber + 1)
-                },
-                rptrIsRuntimeActive = transportState.rptrState != RptrUiRuntimeState.Idle,
-                activeRptrDivision = transportState.activeRptrDivision,
-                rptrBaseUnits = stochasticState.rptrBaseUnits,
-                rptrStartMode = stochasticState.rptrStartMode,
-                showRptrBasePickerDialog = showRptrBasePickerDialog,
-                onShowRptrBasePickerDialogChange = { showRptrBasePickerDialog = it },
-                onDecrementRptrBaseUnits = stochasticViewModel::decrementRptrBaseUnits,
-                onIncrementRptrBaseUnits = stochasticViewModel::incrementRptrBaseUnits,
-                onSetRptrBaseUnits = stochasticViewModel::setRptrBaseUnits,
-                onSetRptrStartMode = stochasticViewModel::setRptrStartMode,
-                onPressRptr = { division ->
-                    transportViewModel.pressRptr(division, stochasticState.toConfig())
-                },
-                onReleaseRptr = transportViewModel::releaseRptr,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp)
+                modifier = Modifier.padding(top = 12.dp)
             )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "Page ${currentPage.pageIndex + 1}",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+
+            SequencerSelector(
+                selectedSequencerType = currentPage.selectedSequencerType,
+                onSelectType = { selectedType ->
+                    sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                        page.withSequencerType(selectedType)
+                    }
+                },
+                onResetParameters = {
+                    updateCurrentTuringState { StochasticSequencerUiState() }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            when (currentPage.selectedSequencerType) {
+                SequencerType.EMPTY -> {
+                    EmptySequencerView(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    )
+                }
+
+                SequencerType.TURING_MACHINE -> {
+                    TuringMachinePanel(
+                        lockPosition = currentTuringState.lockPosition,
+                        sequenceLength = currentTuringState.sequenceLength,
+                        slewAmount = currentTuringState.slewAmount,
+                        bernoulliProbability = currentTuringState.bernoulliProbability,
+                        pitchRangeSemitones = currentTuringState.pitchRangeSemitones,
+                        pitchOffset = currentTuringState.pitchOffset,
+                        gateLength = currentTuringState.gateLength,
+                        randomGateLength = currentTuringState.randomGateLength,
+                        onLockPositionChange = { value ->
+                            updateCurrentTuringState { it.copy(lockPosition = value.coerceIn(-1f, 1f)) }
+                        },
+                        onSequenceLengthChange = { length ->
+                            updateCurrentTuringState { it.copy(sequenceLength = length.coerceIn(2, 64)) }
+                        },
+                        onSlewAmountChange = { value ->
+                            updateCurrentTuringState { it.copy(slewAmount = value.coerceIn(0f, 1f)) }
+                        },
+                        onBernoulliProbabilityChange = { value ->
+                            updateCurrentTuringState {
+                                it.copy(bernoulliProbability = value.coerceIn(0f, 1f))
+                            }
+                        },
+                        onPitchRangeSemitonesChange = { value ->
+                            updateCurrentTuringState {
+                                it.copy(pitchRangeSemitones = value.coerceIn(1, 64))
+                            }
+                        },
+                        onPitchOffsetChange = { value ->
+                            updateCurrentTuringState { it.copy(pitchOffset = value.coerceIn(-24, 24)) }
+                        },
+                        onGateLengthChange = { value ->
+                            updateCurrentTuringState { it.copy(gateLength = value.coerceIn(0f, 1f)) }
+                        },
+                        onRandomGateLengthChange = { value ->
+                            updateCurrentTuringState { it.copy(randomGateLength = value.coerceIn(0f, 1f)) }
+                        },
+                        outputMode = currentTuringState.outputMode,
+                        midiChannel = currentTuringState.midiChannel,
+                        baseNoteDisplay = midiNoteToDisplay(currentTuringState.baseNote),
+                        quantizationDisplayName = currentTuringState.quantizationMode.displayName,
+                        ccNumber = currentTuringState.ccNumber,
+                        onOutputModeChange = { mode ->
+                            updateCurrentTuringState { it.copy(outputMode = mode) }
+                        },
+                        onDecrementMidiChannel = {
+                            updateCurrentTuringState {
+                                val next = if (it.midiChannel <= 1) 16 else it.midiChannel - 1
+                                it.copy(midiChannel = next.coerceIn(1, 16))
+                            }
+                        },
+                        onIncrementMidiChannel = {
+                            updateCurrentTuringState {
+                                val next = if (it.midiChannel >= 16) 1 else it.midiChannel + 1
+                                it.copy(midiChannel = next.coerceIn(1, 16))
+                            }
+                        },
+                        onDecrementBaseNote = {
+                            updateCurrentTuringState {
+                                it.copy(baseNote = (it.baseNote - 1).coerceIn(0, 127))
+                            }
+                        },
+                        onIncrementBaseNote = {
+                            updateCurrentTuringState {
+                                it.copy(baseNote = (it.baseNote + 1).coerceIn(0, 127))
+                            }
+                        },
+                        onQuantizationClick = { showQuantizationDialog = true },
+                        onDecrementCcNumber = {
+                            updateCurrentTuringState {
+                                it.copy(ccNumber = (it.ccNumber - 1).coerceIn(0, 127))
+                            }
+                        },
+                        onIncrementCcNumber = {
+                            updateCurrentTuringState {
+                                it.copy(ccNumber = (it.ccNumber + 1).coerceIn(0, 127))
+                            }
+                        },
+                        rptrIsRuntimeActive = transportState.rptrState != RptrUiRuntimeState.Idle,
+                        activeRptrDivision = transportState.activeRptrDivision,
+                        rptrBaseUnits = currentTuringState.rptrBaseUnits,
+                        rptrStartMode = currentTuringState.rptrStartMode,
+                        showRptrBasePickerDialog = showRptrBasePickerDialog,
+                        onShowRptrBasePickerDialogChange = { showRptrBasePickerDialog = it },
+                        onDecrementRptrBaseUnits = {
+                            updateCurrentTuringState {
+                                it.copy(rptrBaseUnits = (it.rptrBaseUnits - 1).coerceAtLeast(1))
+                            }
+                        },
+                        onIncrementRptrBaseUnits = {
+                            updateCurrentTuringState {
+                                it.copy(rptrBaseUnits = it.rptrBaseUnits + 1)
+                            }
+                        },
+                        onSetRptrBaseUnits = { value ->
+                            updateCurrentTuringState { it.copy(rptrBaseUnits = value.coerceAtLeast(1)) }
+                        },
+                        onSetRptrStartMode = { mode ->
+                            updateCurrentTuringState { it.copy(rptrStartMode = mode) }
+                        },
+                        onPressRptr = { division ->
+                            transportViewModel.pressRptr(division, currentTuringState.toConfig())
+                        },
+                        onReleaseRptr = transportViewModel::releaseRptr,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.weight(1f))
             SectionDivider()
@@ -352,13 +472,13 @@ fun AppScreen(
                         QuantizationMode.entries.forEach { mode ->
                             TextButton(
                                 onClick = {
-                                    stochasticViewModel.setQuantizationMode(mode)
+                                    updateCurrentTuringState { it.copy(quantizationMode = mode) }
                                     showQuantizationDialog = false
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 val selectedPrefix =
-                                    if (mode == stochasticState.quantizationMode) "✓ " else ""
+                                    if (mode == currentTuringState.quantizationMode) "✓ " else ""
                                 Text(text = "$selectedPrefix${mode.displayName}")
                             }
                         }
@@ -440,4 +560,98 @@ private fun SectionDivider() {
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
     )
+}
+
+@Composable
+private fun PageTabs(
+    selectedPageIndex: Int,
+    onSelectPage: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        (0..4).forEach { pageIndex ->
+            val isSelected = pageIndex == selectedPageIndex
+            OutlinedButton(
+                onClick = { onSelectPage(pageIndex) },
+                shape = ProtoControlShape,
+                colors = if (isSelected) {
+                    ButtonDefaults.outlinedButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                    )
+                } else {
+                    ButtonDefaults.outlinedButtonColors()
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(text = "P${pageIndex + 1}")
+            }
+        }
+    }
+}
+
+@Composable
+private fun SequencerSelector(
+    selectedSequencerType: SequencerType,
+    onSelectType: (SequencerType) -> Unit,
+    onResetParameters: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = "Sequencer",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            SequencerType.entries.forEach { sequencerType ->
+                val isSelected = selectedSequencerType == sequencerType
+                OutlinedButton(
+                    onClick = { onSelectType(sequencerType) },
+                    shape = ProtoControlShape,
+                    colors = if (isSelected) {
+                        ButtonDefaults.outlinedButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                        )
+                    } else {
+                        ButtonDefaults.outlinedButtonColors()
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(text = sequencerType.label)
+                }
+            }
+        }
+
+        OutlinedButton(
+            onClick = onResetParameters,
+            enabled = selectedSequencerType == SequencerType.TURING_MACHINE,
+            shape = ProtoControlShape
+        ) {
+            Text(text = "Reset Parameters")
+        }
+    }
+}
+
+@Composable
+private fun EmptySequencerView(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Select a sequencer to activate this page.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
