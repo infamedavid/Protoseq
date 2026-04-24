@@ -54,8 +54,8 @@ import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
-import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoValueField
+import com.infamedavid.protoseq.ui.sequencers.TuringMachineMainControls
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
@@ -228,64 +228,16 @@ fun AppScreen(
             SectionDivider()
 
             TuringMachinePanel {
-                ProtoDualSliderRow(
-                    leftLabel = "LOCK",
-                    leftValue = stochasticState.lockPosition,
-                    leftValueText = "${(stochasticState.lockPosition * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setLockPosition,
-                    leftValueRange = -1f..1f,
-                    rightLabel = "SQLN",
-                    rightValue = (stochasticState.sequenceLength - 2) / 62f,
-                    rightValueText = stochasticState.sequenceLength.toString(),
-                    onRightValueChange = { normalized ->
-                        stochasticViewModel.setSequenceLength((2 + normalized * 62).toInt())
-                    }
-                )
-
-                ProtoDualSliderRow(
-                    leftLabel = "SLEW",
-                    leftValue = stochasticState.slewAmount,
-                    leftValueText = "${(stochasticState.slewAmount * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setSlewAmount,
-                    rightLabel = "BRNL",
-                    rightValue = stochasticState.bernoulliProbability,
-                    rightValueText = "${(stochasticState.bernoulliProbability * 100).toInt()}%",
-                    onRightValueChange = stochasticViewModel::setBernoulliProbability
-                )
-
-                val rangeSemitones = stochasticState.pitchRangeSemitones
-                val rangeOctaves = rangeSemitones / 12
-                val rangeRemainder = rangeSemitones % 12
-                val rangeDisplay = if (rangeRemainder == 0) {
-                    "$rangeOctaves OCT"
-                } else {
-                    "$rangeOctaves OCT + $rangeRemainder"
-                }
-
-                ProtoDualSliderRow(
-                    leftLabel = "RANG",
-                    leftValue = (rangeSemitones - 1) / 63f,
-                    leftValueText = rangeDisplay,
-                    onLeftValueChange = { normalized ->
-                        stochasticViewModel.setPitchRangeSemitones((1 + normalized * 63).toInt())
-                    },
-                    rightLabel = "OFST",
-                    rightValue = (stochasticState.pitchOffset + 24) / 48f,
-                    rightValueText = stochasticState.pitchOffset.toString(),
-                    onRightValueChange = { normalized ->
-                        stochasticViewModel.setPitchOffset((-24 + normalized * 48).toInt())
-                    }
-                )
-
-                ProtoDualSliderRow(
-                    leftLabel = "GLEN",
-                    leftValue = stochasticState.gateLength,
-                    leftValueText = "${(stochasticState.gateLength * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setGateLength,
-                    rightLabel = "RLEN",
-                    rightValue = stochasticState.randomGateLength,
-                    rightValueText = "${(stochasticState.randomGateLength * 100).toInt()}%",
-                    onRightValueChange = stochasticViewModel::setRandomGateLength
+                TuringMachineMainControls(
+                    state = stochasticState,
+                    onLockPositionChange = stochasticViewModel::setLockPosition,
+                    onSequenceLengthChange = stochasticViewModel::setSequenceLength,
+                    onSlewAmountChange = stochasticViewModel::setSlewAmount,
+                    onBernoulliProbabilityChange = stochasticViewModel::setBernoulliProbability,
+                    onPitchRangeSemitonesChange = stochasticViewModel::setPitchRangeSemitones,
+                    onPitchOffsetChange = stochasticViewModel::setPitchOffset,
+                    onGateLengthChange = stochasticViewModel::setGateLength,
+                    onRandomGateLengthChange = stochasticViewModel::setRandomGateLength
                 )
 
                 Row(
