@@ -37,31 +37,6 @@ fun TuringMachineMainControls(
     onGateLengthChange: (Float) -> Unit,
     onRandomGateLengthChange: (Float) -> Unit,
 ) {
-    TuringMachineMainControlsContent(
-        state = state,
-        onLockPositionChange = onLockPositionChange,
-        onSequenceLengthChange = onSequenceLengthChange,
-        onSlewAmountChange = onSlewAmountChange,
-        onBernoulliProbabilityChange = onBernoulliProbabilityChange,
-        onPitchRangeSemitonesChange = onPitchRangeSemitonesChange,
-        onPitchOffsetChange = onPitchOffsetChange,
-        onGateLengthChange = onGateLengthChange,
-        onRandomGateLengthChange = onRandomGateLengthChange
-    )
-}
-
-@Composable
-private fun TuringMachineMainControlsContent(
-    state: StochasticSequencerUiState,
-    onLockPositionChange: (Float) -> Unit,
-    onSequenceLengthChange: (Int) -> Unit,
-    onSlewAmountChange: (Float) -> Unit,
-    onBernoulliProbabilityChange: (Float) -> Unit,
-    onPitchRangeSemitonesChange: (Int) -> Unit,
-    onPitchOffsetChange: (Int) -> Unit,
-    onGateLengthChange: (Float) -> Unit,
-    onRandomGateLengthChange: (Float) -> Unit,
-) {
     ProtoDualSliderRow(
         leftLabel = "LOCK",
         leftValue = state.lockPosition,
