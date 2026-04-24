@@ -29,6 +29,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
 
 class TransportViewModel(
@@ -39,6 +42,7 @@ class TransportViewModel(
     )
 ) : ViewModel() {
     private val vmScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val runtimeMutex = Mutex()
     private val activeTuringPageConfigs = mutableMapOf<Int, StochasticSequencerConfig>()
     private val pageRuntimes = mutableMapOf<Int, PageRuntime>()
     private var latestClockTick: Long = 1L
@@ -67,18 +71,20 @@ class TransportViewModel(
 
         vmScope.launch {
             clockEngine.ticks.collect { tick ->
-                latestClockTick = tick
-                pageRuntimes.forEach { (pageIndex, runtime) ->
-                    val repeaterTickResult = runtime.repeaterEngine.onTick(tick)
-                    sendRepeaterMidi(repeaterTickResult.midi)
-                    processDueNoteOffs(runtime, tick)
-                    val config = activeTuringPageConfigs[pageIndex]
-                    if (config != null && isSequencerStepTick(tick)) {
-                        advanceSequencer(runtime, config, tick)
+                runtimeMutex.withLock {
+                    latestClockTick = tick
+                    pageRuntimes.forEach { (pageIndex, runtime) ->
+                        val repeaterTickResult = runtime.repeaterEngine.onTick(tick)
+                        sendRepeaterMidi(repeaterTickResult.midi)
+                        processDueNoteOffs(runtime, tick)
+                        val config = activeTuringPageConfigs[pageIndex]
+                        if (config != null && isSequencerStepTick(tick)) {
+                            advanceSequencer(runtime, config, tick)
+                        }
+                        processCcSlewTick(runtime, config)
                     }
-                    processCcSlewTick(runtime, config)
+                    syncRptrUiState()
                 }
-                syncRptrUiState()
                 if (tick % 4L == 0L) {
                     midiEngine.sendClock()
                 }
@@ -112,103 +118,127 @@ class TransportViewModel(
     }
 
     fun play() {
-        when (clockEngine.getTransportState()) {
-            TransportState.Stopped -> {
-                pageRuntimes.values.forEach { runtime ->
-                    sendAndClearPendingNoteOffs(runtime)
-                    clearCcSlewState(runtime)
-                    runtime.sequencerEngine.reset()
-                    runtime.repeaterEngine.reset()
+        vmScope.launch {
+            runtimeMutex.withLock {
+                when (clockEngine.getTransportState()) {
+                    TransportState.Stopped -> {
+                        pageRuntimes.values.forEach { runtime ->
+                            sendAndClearPendingNoteOffs(runtime)
+                            clearCcSlewState(runtime)
+                            runtime.sequencerEngine.reset()
+                            runtime.repeaterEngine.reset()
+                        }
+                        syncRptrUiState()
+                        clockEngine.playFromStart()
+                        midiEngine.sendStart()
+                    }
+
+                    TransportState.Paused -> {
+                        clockEngine.resume()
+                        midiEngine.sendContinue()
+                    }
+
+                    TransportState.Playing -> Unit
                 }
-                syncRptrUiState()
-                clockEngine.playFromStart()
-                midiEngine.sendStart()
             }
-
-            TransportState.Paused -> {
-                clockEngine.resume()
-                midiEngine.sendContinue()
-            }
-
-            TransportState.Playing -> Unit
         }
     }
 
     fun stop() {
-        when (clockEngine.getTransportState()) {
-            TransportState.Playing,
-            TransportState.Paused -> {
-                pageRuntimes.values.forEach { runtime ->
-                    val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
-                    sendRepeaterMidi(stopResult.midi)
-                    sendAndClearPendingNoteOffs(runtime)
-                    clearCcSlewState(runtime)
-                }
-                syncRptrUiState()
-                clockEngine.stop()
-                midiEngine.sendStop()
-            }
+        vmScope.launch {
+            runtimeMutex.withLock {
+                when (clockEngine.getTransportState()) {
+                    TransportState.Playing,
+                    TransportState.Paused -> {
+                        pageRuntimes.values.forEach { runtime ->
+                            val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
+                            sendRepeaterMidi(stopResult.midi)
+                            sendAndClearPendingNoteOffs(runtime)
+                            clearCcSlewState(runtime)
+                        }
+                        syncRptrUiState()
+                        clockEngine.stop()
+                        midiEngine.sendStop()
+                    }
 
-            TransportState.Stopped -> Unit
+                    TransportState.Stopped -> Unit
+                }
+            }
         }
     }
 
     fun pause() {
-        if (clockEngine.getTransportState() == TransportState.Playing) {
-            pageRuntimes.values.forEach { runtime ->
-                val pauseResult = runtime.repeaterEngine.onTransportPause(currentTick = 0L)
-                sendRepeaterMidi(pauseResult.midi)
-                sendAndClearPendingNoteOffs(runtime)
+        vmScope.launch {
+            runtimeMutex.withLock {
+                if (clockEngine.getTransportState() == TransportState.Playing) {
+                    pageRuntimes.values.forEach { runtime ->
+                        val pauseResult = runtime.repeaterEngine.onTransportPause(currentTick = 0L)
+                        sendRepeaterMidi(pauseResult.midi)
+                        sendAndClearPendingNoteOffs(runtime)
+                    }
+                    syncRptrUiState()
+                    clockEngine.pause()
+                }
             }
-            syncRptrUiState()
-            clockEngine.pause()
         }
     }
 
     fun updateTuringPageConfigs(configs: List<TuringPageConfig>) {
-        val nextConfigsByPage = configs.associate { it.pageIndex to it.config.sanitized() }
+        vmScope.launch {
+            runtimeMutex.withLock {
+                val nextConfigsByPage = configs.associate { it.pageIndex to it.config.sanitized() }
 
-        nextConfigsByPage.keys.forEach { pageIndex ->
-            pageRuntimes.getOrPut(pageIndex) { PageRuntime(pageIndex = pageIndex) }
-        }
+                nextConfigsByPage.keys.forEach { pageIndex ->
+                    pageRuntimes.getOrPut(pageIndex) { PageRuntime(pageIndex = pageIndex) }
+                }
 
-        val removedPageIndexes = activeTuringPageConfigs.keys - nextConfigsByPage.keys
-        removedPageIndexes.forEach { pageIndex ->
-            pageRuntimes.remove(pageIndex)?.let { runtime ->
-                val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = latestClockTick)
-                sendRepeaterMidi(stopResult.midi)
-                sendAndClearPendingNoteOffs(runtime)
-                clearCcSlewState(runtime)
+                val removedPageIndexes = activeTuringPageConfigs.keys - nextConfigsByPage.keys
+                removedPageIndexes.forEach { pageIndex ->
+                    pageRuntimes.remove(pageIndex)?.let { runtime ->
+                        val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = latestClockTick)
+                        sendRepeaterMidi(stopResult.midi)
+                        sendAndClearPendingNoteOffs(runtime)
+                        clearCcSlewState(runtime)
+                    }
+                }
+
+                activeTuringPageConfigs.clear()
+                activeTuringPageConfigs.putAll(nextConfigsByPage)
+                syncRptrUiState()
             }
         }
-
-        activeTuringPageConfigs.clear()
-        activeTuringPageConfigs.putAll(nextConfigsByPage)
-        syncRptrUiState()
     }
 
     fun pressRptr(pageIndex: Int, division: RptrDivision, config: StochasticSequencerConfig) {
-        if (activeTuringPageConfigs[pageIndex] == null) return
-        val runtime = pageRuntimes.getOrPut(pageIndex) { PageRuntime(pageIndex = pageIndex) }
-        if (isRptrBusy(runtime)) return
+        vmScope.launch {
+            runtimeMutex.withLock {
+                if (activeTuringPageConfigs[pageIndex] == null) return@withLock
+                val runtime = pageRuntimes.getOrPut(pageIndex) { PageRuntime(pageIndex = pageIndex) }
+                if (isRptrBusy(runtime)) return@withLock
 
-        val rptrConfig = RptrConfig(
-            baseUnits = config.rptrBaseUnits,
-            startMode = config.rptrStartMode
-        )
-        runtime.repeaterEngine.press(
-            division = division,
-            config = rptrConfig,
-            currentTick = latestClockTick
-        )
-        syncRptrUiState()
+                val rptrConfig = RptrConfig(
+                    baseUnits = config.rptrBaseUnits,
+                    startMode = config.rptrStartMode
+                )
+                runtime.repeaterEngine.press(
+                    division = division,
+                    config = rptrConfig,
+                    currentTick = latestClockTick
+                )
+                syncRptrUiState()
+            }
+        }
     }
 
     fun releaseRptr(pageIndex: Int) {
-        val runtime = pageRuntimes[pageIndex] ?: return
-        val releaseResult = runtime.repeaterEngine.release(currentTick = latestClockTick)
-        sendRepeaterMidi(releaseResult.midi)
-        syncRptrUiState()
+        vmScope.launch {
+            runtimeMutex.withLock {
+                val runtime = pageRuntimes[pageIndex] ?: return@withLock
+                val releaseResult = runtime.repeaterEngine.release(currentTick = latestClockTick)
+                sendRepeaterMidi(releaseResult.midi)
+                syncRptrUiState()
+            }
+        }
     }
 
     private fun isRptrBusy(runtime: PageRuntime): Boolean = when (runtime.repeaterEngine.getState()) {
@@ -398,12 +428,16 @@ class TransportViewModel(
     }
 
     override fun onCleared() {
-        pageRuntimes.values.forEach { runtime ->
-            val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
-            sendRepeaterMidi(stopResult.midi)
-            sendAndClearPendingNoteOffs(runtime)
+        runBlocking {
+            runtimeMutex.withLock {
+                pageRuntimes.values.forEach { runtime ->
+                    val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
+                    sendRepeaterMidi(stopResult.midi)
+                    sendAndClearPendingNoteOffs(runtime)
+                }
+                syncRptrUiState()
+            }
         }
-        syncRptrUiState()
         midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
         super.onCleared()
