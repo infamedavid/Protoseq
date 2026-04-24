@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
-import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerViewModel
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
