@@ -54,7 +54,6 @@ import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
-import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
