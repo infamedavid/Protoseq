@@ -227,70 +227,26 @@ fun AppScreen(
             SectionDivider()
 
             TuringMachinePanel(
+                lockPosition = stochasticState.lockPosition,
+                sequenceLength = stochasticState.sequenceLength,
+                slewAmount = stochasticState.slewAmount,
+                bernoulliProbability = stochasticState.bernoulliProbability,
+                pitchRangeSemitones = stochasticState.pitchRangeSemitones,
+                pitchOffset = stochasticState.pitchOffset,
+                gateLength = stochasticState.gateLength,
+                randomGateLength = stochasticState.randomGateLength,
+                onLockPositionChange = stochasticViewModel::setLockPosition,
+                onSequenceLengthChange = stochasticViewModel::setSequenceLength,
+                onSlewAmountChange = stochasticViewModel::setSlewAmount,
+                onBernoulliProbabilityChange = stochasticViewModel::setBernoulliProbability,
+                onPitchRangeSemitonesChange = stochasticViewModel::setPitchRangeSemitones,
+                onPitchOffsetChange = stochasticViewModel::setPitchOffset,
+                onGateLengthChange = stochasticViewModel::setGateLength,
+                onRandomGateLengthChange = stochasticViewModel::setRandomGateLength,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 12.dp)
             ) {
-                ProtoDualSliderRow(
-                    leftLabel = "LOCK",
-                    leftValue = stochasticState.lockPosition,
-                    leftValueText = "${(stochasticState.lockPosition * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setLockPosition,
-                    leftValueRange = -1f..1f,
-                    rightLabel = "SQLN",
-                    rightValue = (stochasticState.sequenceLength - 2) / 62f,
-                    rightValueText = stochasticState.sequenceLength.toString(),
-                    onRightValueChange = { normalized ->
-                        stochasticViewModel.setSequenceLength((2 + normalized * 62).toInt())
-                    }
-                )
-
-                ProtoDualSliderRow(
-                    leftLabel = "SLEW",
-                    leftValue = stochasticState.slewAmount,
-                    leftValueText = "${(stochasticState.slewAmount * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setSlewAmount,
-                    rightLabel = "BRNL",
-                    rightValue = stochasticState.bernoulliProbability,
-                    rightValueText = "${(stochasticState.bernoulliProbability * 100).toInt()}%",
-                    onRightValueChange = stochasticViewModel::setBernoulliProbability
-                )
-
-                val rangeSemitones = stochasticState.pitchRangeSemitones
-                val rangeOctaves = rangeSemitones / 12
-                val rangeRemainder = rangeSemitones % 12
-                val rangeDisplay = if (rangeRemainder == 0) {
-                    "$rangeOctaves OCT"
-                } else {
-                    "$rangeOctaves OCT + $rangeRemainder"
-                }
-
-                ProtoDualSliderRow(
-                    leftLabel = "RANG",
-                    leftValue = (rangeSemitones - 1) / 63f,
-                    leftValueText = rangeDisplay,
-                    onLeftValueChange = { normalized ->
-                        stochasticViewModel.setPitchRangeSemitones((1 + normalized * 63).toInt())
-                    },
-                    rightLabel = "OFST",
-                    rightValue = (stochasticState.pitchOffset + 24) / 48f,
-                    rightValueText = stochasticState.pitchOffset.toString(),
-                    onRightValueChange = { normalized ->
-                        stochasticViewModel.setPitchOffset((-24 + normalized * 48).toInt())
-                    }
-                )
-
-                ProtoDualSliderRow(
-                    leftLabel = "GLEN",
-                    leftValue = stochasticState.gateLength,
-                    leftValueText = "${(stochasticState.gateLength * 100).toInt()}%",
-                    onLeftValueChange = stochasticViewModel::setGateLength,
-                    rightLabel = "RLEN",
-                    rightValue = stochasticState.randomGateLength,
-                    rightValueText = "${(stochasticState.randomGateLength * 100).toInt()}%",
-                    onRightValueChange = stochasticViewModel::setRandomGateLength
-                )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
