@@ -110,4 +110,8 @@ class StochasticSequencerViewModel : ViewModel() {
     fun setRptrStartMode(mode: RptrStartMode) {
         _uiState.value = _uiState.value.copy(rptrStartMode = mode)
     }
+
+    fun resetToDefaults() {
+        _uiState.value = StochasticSequencerUiState()
+    }
 }
