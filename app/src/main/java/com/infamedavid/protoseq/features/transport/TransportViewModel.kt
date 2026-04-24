@@ -21,8 +21,6 @@ import com.infamedavid.protoseq.core.repeater.RptrState
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
-import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
-import com.infamedavid.protoseq.features.stochastic.toConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,12 +39,8 @@ class TransportViewModel(
     )
 ) : ViewModel() {
     private val vmScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val sequencerEngine = StochasticSequencerEngine()
-    private val repeaterEngine = RepeaterEngine()
-    private var sequencerConfig: StochasticSequencerConfig = StochasticSequencerUiState().toConfig()
-    private val scheduledNoteOffs = mutableListOf<ScheduledNoteOff>()
-    private var lastSentCcValue: Int? = null
-    private var activeCcSlew: ActiveCcSlew? = null
+    private val activeTuringPageConfigs = mutableMapOf<Int, StochasticSequencerConfig>()
+    private val pageRuntimes = mutableMapOf<Int, PageRuntime>()
     private var latestClockTick: Long = 1L
 
     private val _uiState = MutableStateFlow(
@@ -74,14 +68,17 @@ class TransportViewModel(
         vmScope.launch {
             clockEngine.ticks.collect { tick ->
                 latestClockTick = tick
-                val repeaterTickResult = repeaterEngine.onTick(tick)
-                sendRepeaterMidi(repeaterTickResult.midi)
-                syncRptrUiState()
-                processDueNoteOffs(tick)
-                if (isSequencerStepTick(tick)) {
-                    advanceSequencer(tick)
+                pageRuntimes.forEach { (pageIndex, runtime) ->
+                    val repeaterTickResult = runtime.repeaterEngine.onTick(tick)
+                    sendRepeaterMidi(repeaterTickResult.midi)
+                    processDueNoteOffs(runtime, tick)
+                    val config = activeTuringPageConfigs[pageIndex]
+                    if (config != null && isSequencerStepTick(tick)) {
+                        advanceSequencer(runtime, config, tick)
+                    }
+                    processCcSlewTick(runtime, config)
                 }
-                processCcSlewTick()
+                syncRptrUiState()
                 if (tick % 4L == 0L) {
                     midiEngine.sendClock()
                 }
@@ -117,10 +114,12 @@ class TransportViewModel(
     fun play() {
         when (clockEngine.getTransportState()) {
             TransportState.Stopped -> {
-                sendAndClearPendingNoteOffs()
-                clearCcSlewState()
-                sequencerEngine.reset()
-                repeaterEngine.reset()
+                pageRuntimes.values.forEach { runtime ->
+                    sendAndClearPendingNoteOffs(runtime)
+                    clearCcSlewState(runtime)
+                    runtime.sequencerEngine.reset()
+                    runtime.repeaterEngine.reset()
+                }
                 syncRptrUiState()
                 clockEngine.playFromStart()
                 midiEngine.sendStart()
@@ -139,11 +138,13 @@ class TransportViewModel(
         when (clockEngine.getTransportState()) {
             TransportState.Playing,
             TransportState.Paused -> {
-                val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
-                sendRepeaterMidi(stopResult.midi)
+                pageRuntimes.values.forEach { runtime ->
+                    val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
+                    sendRepeaterMidi(stopResult.midi)
+                    sendAndClearPendingNoteOffs(runtime)
+                    clearCcSlewState(runtime)
+                }
                 syncRptrUiState()
-                sendAndClearPendingNoteOffs()
-                clearCcSlewState()
                 clockEngine.stop()
                 midiEngine.sendStop()
             }
@@ -154,26 +155,48 @@ class TransportViewModel(
 
     fun pause() {
         if (clockEngine.getTransportState() == TransportState.Playing) {
-            val pauseResult = repeaterEngine.onTransportPause(currentTick = 0L)
-            sendRepeaterMidi(pauseResult.midi)
+            pageRuntimes.values.forEach { runtime ->
+                val pauseResult = runtime.repeaterEngine.onTransportPause(currentTick = 0L)
+                sendRepeaterMidi(pauseResult.midi)
+                sendAndClearPendingNoteOffs(runtime)
+            }
             syncRptrUiState()
-            sendAndClearPendingNoteOffs()
             clockEngine.pause()
         }
     }
 
-    fun updateSequencerConfig(config: StochasticSequencerConfig) {
-        sequencerConfig = config.sanitized()
+    fun updateTuringPageConfigs(configs: List<TuringPageConfig>) {
+        val nextConfigsByPage = configs.associate { it.pageIndex to it.config.sanitized() }
+
+        nextConfigsByPage.keys.forEach { pageIndex ->
+            pageRuntimes.getOrPut(pageIndex) { PageRuntime(pageIndex = pageIndex) }
+        }
+
+        val removedPageIndexes = activeTuringPageConfigs.keys - nextConfigsByPage.keys
+        removedPageIndexes.forEach { pageIndex ->
+            pageRuntimes.remove(pageIndex)?.let { runtime ->
+                val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = latestClockTick)
+                sendRepeaterMidi(stopResult.midi)
+                sendAndClearPendingNoteOffs(runtime)
+                clearCcSlewState(runtime)
+            }
+        }
+
+        activeTuringPageConfigs.clear()
+        activeTuringPageConfigs.putAll(nextConfigsByPage)
+        syncRptrUiState()
     }
 
-    fun pressRptr(division: RptrDivision, config: StochasticSequencerConfig) {
-        if (isRptrBusy()) return
+    fun pressRptr(pageIndex: Int, division: RptrDivision, config: StochasticSequencerConfig) {
+        if (activeTuringPageConfigs[pageIndex] == null) return
+        val runtime = pageRuntimes.getOrPut(pageIndex) { PageRuntime(pageIndex = pageIndex) }
+        if (isRptrBusy(runtime)) return
 
         val rptrConfig = RptrConfig(
             baseUnits = config.rptrBaseUnits,
             startMode = config.rptrStartMode
         )
-        repeaterEngine.press(
+        runtime.repeaterEngine.press(
             division = division,
             config = rptrConfig,
             currentTick = latestClockTick
@@ -181,13 +204,14 @@ class TransportViewModel(
         syncRptrUiState()
     }
 
-    fun releaseRptr() {
-        val releaseResult = repeaterEngine.release(currentTick = latestClockTick)
+    fun releaseRptr(pageIndex: Int) {
+        val runtime = pageRuntimes[pageIndex] ?: return
+        val releaseResult = runtime.repeaterEngine.release(currentTick = latestClockTick)
         sendRepeaterMidi(releaseResult.midi)
         syncRptrUiState()
     }
 
-    private fun isRptrBusy(): Boolean = when (repeaterEngine.getState()) {
+    private fun isRptrBusy(runtime: PageRuntime): Boolean = when (runtime.repeaterEngine.getState()) {
         is RptrState.Wait,
         is RptrState.Record,
         is RptrState.Loop -> true
@@ -198,12 +222,12 @@ class TransportViewModel(
 
     private fun isSequencerStepTick(tick: Long): Boolean = ((tick - 1L) % TICKS_PER_STEP) == 0L
 
-    private fun processDueNoteOffs(currentTick: Long) {
-        val iterator = scheduledNoteOffs.iterator()
+    private fun processDueNoteOffs(runtime: PageRuntime, currentTick: Long) {
+        val iterator = runtime.scheduledNoteOffs.iterator()
         while (iterator.hasNext()) {
             val scheduled = iterator.next()
             if (scheduled.dueTick == currentTick) {
-                val routeResult = repeaterEngine.onLiveNoteOff(
+                val routeResult = runtime.repeaterEngine.onLiveNoteOff(
                     MidiNoteOffEvent(
                         tick = currentTick,
                         channel = scheduled.channel,
@@ -222,17 +246,21 @@ class TransportViewModel(
         }
     }
 
-    private fun advanceSequencer(currentTick: Long) {
-        val output = sequencerEngine.advance(sequencerConfig)
-        when (sequencerConfig.outputMode) {
+    private fun advanceSequencer(
+        runtime: PageRuntime,
+        config: StochasticSequencerConfig,
+        currentTick: Long
+    ) {
+        val output = runtime.sequencerEngine.advance(config)
+        when (config.outputMode) {
             MidiOutputMode.NOTE -> {
                 val note = output.note ?: return
                 if (!output.gate || !output.trigger) return
 
-                val routeResult = repeaterEngine.onLiveNoteOn(
+                val routeResult = runtime.repeaterEngine.onLiveNoteOn(
                     MidiNoteOnEvent(
                         tick = currentTick,
-                        channel = sequencerConfig.midiChannel,
+                        channel = config.midiChannel,
                         note = note,
                         velocity = 100
                     )
@@ -240,13 +268,13 @@ class TransportViewModel(
                 sendRepeaterMidi(routeResult.extraMidi)
                 if (routeResult.passThrough) {
                     midiEngine.sendNoteOn(
-                        channel = sequencerConfig.midiChannel,
+                        channel = config.midiChannel,
                         note = note,
                         velocity = 100
                     )
-                    scheduledNoteOffs += ScheduledNoteOff(
+                    runtime.scheduledNoteOffs += ScheduledNoteOff(
                         dueTick = currentTick + output.gateLengthTicks,
-                        channel = sequencerConfig.midiChannel,
+                        channel = config.midiChannel,
                         note = note
                     )
                 }
@@ -256,21 +284,21 @@ class TransportViewModel(
                 val ccValue = output.ccValue ?: return
                 if (!output.gate || !output.trigger) return
 
-                val slewTicks = (sequencerConfig.slewAmount * TICKS_PER_STEP.toFloat())
+                val slewTicks = (config.slewAmount * TICKS_PER_STEP.toFloat())
                     .roundToInt()
                     .coerceIn(0, TICKS_PER_STEP.toInt())
                 if (slewTicks <= 0) {
-                    activeCcSlew = null
-                    sendControlChangeIfNeeded(ccValue)
+                    runtime.activeCcSlew = null
+                    sendControlChangeIfNeeded(runtime, config, ccValue)
                     return
                 }
 
-                val startValue = lastSentCcValue ?: ccValue
+                val startValue = runtime.lastSentCcValue ?: ccValue
                 if (startValue == ccValue) {
-                    activeCcSlew = null
-                    sendControlChangeIfNeeded(ccValue)
+                    runtime.activeCcSlew = null
+                    sendControlChangeIfNeeded(runtime, config, ccValue)
                 } else {
-                    activeCcSlew = ActiveCcSlew(
+                    runtime.activeCcSlew = ActiveCcSlew(
                         startValue = startValue,
                         targetValue = ccValue,
                         durationTicks = slewTicks,
@@ -281,8 +309,9 @@ class TransportViewModel(
         }
     }
 
-    private fun processCcSlewTick() {
-        val slew = activeCcSlew ?: return
+    private fun processCcSlewTick(runtime: PageRuntime, config: StochasticSequencerConfig?) {
+        val activeConfig = config ?: return
+        val slew = runtime.activeCcSlew ?: return
         val nextElapsed = (slew.elapsedTicks + 1).coerceAtMost(slew.durationTicks)
         val progress = nextElapsed.toFloat() / slew.durationTicks.toFloat()
         val interpolated = slew.startValue + (slew.targetValue - slew.startValue) * progress
@@ -292,29 +321,34 @@ class TransportViewModel(
             interpolated.roundToInt().coerceIn(MIDI_MIN, MIDI_MAX)
         }
 
-        sendControlChangeIfNeeded(nextValue)
+        sendControlChangeIfNeeded(runtime, activeConfig, nextValue)
 
-        activeCcSlew = if (nextElapsed >= slew.durationTicks) {
+        runtime.activeCcSlew = if (nextElapsed >= slew.durationTicks) {
             null
         } else {
             slew.copy(elapsedTicks = nextElapsed)
         }
     }
 
-    private fun sendControlChangeIfNeeded(value: Int) {
+    private fun sendControlChangeIfNeeded(
+        runtime: PageRuntime,
+        config: StochasticSequencerConfig,
+        value: Int
+    ) {
         val ccValue = value.coerceIn(MIDI_MIN, MIDI_MAX)
-        if (lastSentCcValue == ccValue) return
+        if (runtime.lastSentCcValue == ccValue) return
 
         midiEngine.sendControlChange(
-            channel = sequencerConfig.midiChannel,
-            controller = sequencerConfig.ccNumber,
+            channel = config.midiChannel,
+            controller = config.ccNumber,
             value = ccValue
         )
-        lastSentCcValue = ccValue
+        runtime.lastSentCcValue = ccValue
     }
 
-    private fun clearCcSlewState() {
-        activeCcSlew = null
+    private fun clearCcSlewState(runtime: PageRuntime) {
+        runtime.activeCcSlew = null
+        runtime.lastSentCcValue = null
     }
 
     private fun sendRepeaterMidi(messages: List<RptrMidiOut>) {
@@ -334,32 +368,42 @@ class TransportViewModel(
         }
     }
 
-    private fun sendAndClearPendingNoteOffs() {
-        scheduledNoteOffs.forEach { scheduled ->
+    private fun sendAndClearPendingNoteOffs(runtime: PageRuntime) {
+        runtime.scheduledNoteOffs.forEach { scheduled ->
             midiEngine.sendNoteOff(channel = scheduled.channel, note = scheduled.note)
         }
-        scheduledNoteOffs.clear()
+        runtime.scheduledNoteOffs.clear()
     }
 
     private fun syncRptrUiState() {
-        val (rptrState, activeRptrDivision) = when (val state = repeaterEngine.getState()) {
-            is RptrState.Idle -> RptrUiRuntimeState.Idle to null
-            is RptrState.Wait -> RptrUiRuntimeState.Wait to state.division
-            is RptrState.Record -> RptrUiRuntimeState.Record to state.division
-            is RptrState.Loop -> RptrUiRuntimeState.Loop to state.division
-            is RptrState.Release -> RptrUiRuntimeState.Idle to null
+        val statesByPage = mutableMapOf<Int, RptrUiRuntimeState>()
+        val activeDivisionsByPage = mutableMapOf<Int, RptrDivision?>()
+
+        pageRuntimes.forEach { (pageIndex, runtime) ->
+            val (rptrState, activeRptrDivision) = when (val state = runtime.repeaterEngine.getState()) {
+                is RptrState.Idle -> RptrUiRuntimeState.Idle to null
+                is RptrState.Wait -> RptrUiRuntimeState.Wait to state.division
+                is RptrState.Record -> RptrUiRuntimeState.Record to state.division
+                is RptrState.Loop -> RptrUiRuntimeState.Loop to state.division
+                is RptrState.Release -> RptrUiRuntimeState.Idle to null
+            }
+            statesByPage[pageIndex] = rptrState
+            activeDivisionsByPage[pageIndex] = activeRptrDivision
         }
+
         _uiState.value = _uiState.value.copy(
-            rptrState = rptrState,
-            activeRptrDivision = activeRptrDivision
+            rptrStatesByPage = statesByPage,
+            activeRptrDivisionsByPage = activeDivisionsByPage
         )
     }
 
     override fun onCleared() {
-        val stopResult = repeaterEngine.onTransportStop(currentTick = 0L)
-        sendRepeaterMidi(stopResult.midi)
+        pageRuntimes.values.forEach { runtime ->
+            val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
+            sendRepeaterMidi(stopResult.midi)
+            sendAndClearPendingNoteOffs(runtime)
+        }
         syncRptrUiState()
-        sendAndClearPendingNoteOffs()
         midiEngine.stopDeviceMonitoring()
         vmScope.cancel()
         super.onCleared()
@@ -402,4 +446,18 @@ class TransportViewModel(
         val channel: Int,
         val note: Int
     )
+
+    private data class PageRuntime(
+        val pageIndex: Int,
+        val sequencerEngine: StochasticSequencerEngine = StochasticSequencerEngine(),
+        val repeaterEngine: RepeaterEngine = RepeaterEngine(),
+        val scheduledNoteOffs: MutableList<ScheduledNoteOff> = mutableListOf(),
+        var activeCcSlew: ActiveCcSlew? = null,
+        var lastSentCcValue: Int? = null
+    )
 }
+
+data class TuringPageConfig(
+    val pageIndex: Int,
+    val config: StochasticSequencerConfig
+)

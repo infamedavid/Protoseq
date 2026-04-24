@@ -53,6 +53,7 @@ import com.infamedavid.protoseq.features.sequencer.updatePage
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
+import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
@@ -111,10 +112,19 @@ fun AppScreen(
         }
     }
 
-    LaunchedEffect(currentPage.selectedSequencerType, currentTuringState) {
-        if (currentPage.selectedSequencerType == SequencerType.TURING_MACHINE) {
-            transportViewModel.updateSequencerConfig(currentTuringState.toConfig())
-        }
+    val turingPageConfigs = remember(sessionState.pages) {
+        sessionState.pages
+            .filter { it.selectedSequencerType == SequencerType.TURING_MACHINE }
+            .map { page ->
+                TuringPageConfig(
+                    pageIndex = page.pageIndex,
+                    config = page.turingState.toConfig()
+                )
+            }
+    }
+
+    LaunchedEffect(turingPageConfigs) {
+        transportViewModel.updateTuringPageConfigs(turingPageConfigs)
     }
 
     Surface(
@@ -361,8 +371,11 @@ fun AppScreen(
                                 it.copy(ccNumber = (it.ccNumber + 1).coerceIn(0, 127))
                             }
                         },
-                        rptrIsRuntimeActive = transportState.rptrState != RptrUiRuntimeState.Idle,
-                        activeRptrDivision = transportState.activeRptrDivision,
+                        rptrIsRuntimeActive = (
+                            transportState.rptrStatesByPage[currentPage.pageIndex]
+                                ?: RptrUiRuntimeState.Idle
+                            ) != RptrUiRuntimeState.Idle,
+                        activeRptrDivision = transportState.activeRptrDivisionsByPage[currentPage.pageIndex],
                         rptrBaseUnits = currentTuringState.rptrBaseUnits,
                         rptrStartMode = currentTuringState.rptrStartMode,
                         showRptrBasePickerDialog = showRptrBasePickerDialog,
@@ -384,9 +397,13 @@ fun AppScreen(
                             updateCurrentTuringState { it.copy(rptrStartMode = mode) }
                         },
                         onPressRptr = { division ->
-                            transportViewModel.pressRptr(division, currentTuringState.toConfig())
+                            transportViewModel.pressRptr(
+                                pageIndex = currentPage.pageIndex,
+                                division = division,
+                                config = currentTuringState.toConfig()
+                            )
                         },
-                        onReleaseRptr = transportViewModel::releaseRptr,
+                        onReleaseRptr = { transportViewModel.releaseRptr(currentPage.pageIndex) },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 12.dp)
