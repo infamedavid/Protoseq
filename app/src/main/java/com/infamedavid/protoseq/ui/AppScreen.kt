@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -435,7 +436,7 @@ fun AppScreen(
 
 @Composable
 private fun SectionDivider() {
-    HorizontalDivider(
+    Divider(
         modifier = Modifier.fillMaxWidth(),
         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
     )

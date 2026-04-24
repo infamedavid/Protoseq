@@ -6,9 +6,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -17,9 +16,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.core.repeater.RptrDivision
 import com.infamedavid.protoseq.core.repeater.RptrStartMode
+import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.components.ProtoDualSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoMomentaryButton
@@ -92,6 +91,7 @@ fun TuringMachinePanel(
             onGateLengthChange = onGateLengthChange,
             onRandomGateLengthChange = onRandomGateLengthChange
         )
+
         TuringMachineMidiControls(
             outputMode = outputMode,
             midiChannel = midiChannel,
@@ -107,6 +107,7 @@ fun TuringMachinePanel(
             onDecrementCcNumber = onDecrementCcNumber,
             onIncrementCcNumber = onIncrementCcNumber
         )
+
         TuringMachineRepeaterControls(
             outputMode = outputMode,
             rptrIsRuntimeActive = rptrIsRuntimeActive,
@@ -318,7 +319,7 @@ private fun TuringMachineRepeaterControls(
     )
 
     Spacer(modifier = Modifier.height(2.dp))
-    HorizontalDivider()
+    Divider()
     Spacer(modifier = Modifier.height(8.dp))
 
     Row(
@@ -462,6 +463,7 @@ private fun TuringMachineRepeaterControls(
                                     Text(text = "$prefix$value")
                                 }
                             }
+
                             repeat(5 - rowValues.size) {
                                 Spacer(modifier = Modifier.weight(1f))
                             }
