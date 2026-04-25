@@ -1,6 +1,10 @@
 package com.infamedavid.protoseq.features.session
 
 import android.content.Context
+import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
+import com.infamedavid.protoseq.features.grid616.Grid616StepState
+import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.PROTOSEQ_SESSION_STATE_VERSION
 import com.infamedavid.protoseq.features.sequencer.ProtoseqSessionState
@@ -180,6 +184,7 @@ fun ProtoseqSessionState.toJsonObject(): JSONObject {
                 .put("enabled", page.enabled)
                 .put("selectedSequencerType", page.selectedSequencerType.name)
                 .put("turingState", page.turingState.toJsonObject())
+                .put("grid616State", page.grid616State.toJsonObject())
         )
     }
 
@@ -211,7 +216,11 @@ fun protoseqSessionStateFromJsonObject(json: JSONObject): ProtoseqSessionState {
             turingState = stochasticSequencerUiStateFromJsonObject(
                 pageJson.optJSONObject("turingState"),
                 defaultPage.turingState,
-            )
+            ),
+            grid616State = grid616SequencerUiStateFromJsonObject(
+                pageJson.optJSONObject("grid616State"),
+                defaultPage.grid616State,
+            ),
         )
 
         parsedPages[normalizedPageIndex] = parsedPage
@@ -285,6 +294,94 @@ private fun stochasticSequencerUiStateFromJsonObject(
         )
     )
 }
+
+private fun Grid616SequencerUiState.toJsonObject(): JSONObject = JSONObject()
+    .put("midiChannel", midiChannel)
+    .put("swingAmount", swingAmount)
+    .put("playbackMode", playbackMode.name)
+    .put(
+        "tracks",
+        JSONArray().apply {
+            tracks.forEach { track ->
+                put(track.toJsonObject())
+            }
+        }
+    )
+
+private fun Grid616TrackState.toJsonObject(): JSONObject = JSONObject()
+    .put("note", note)
+    .put("muted", muted)
+    .put("length", length)
+    .put(
+        "steps",
+        JSONArray().apply {
+            steps.forEach { step ->
+                put(step.toJsonObject())
+            }
+        }
+    )
+
+private fun Grid616StepState.toJsonObject(): JSONObject = JSONObject()
+    .put("enabled", enabled)
+    .put("velocity", velocity)
+    .put("delayTicks", delayTicks)
+
+private fun grid616SequencerUiStateFromJsonObject(
+    json: JSONObject?,
+    defaultState: Grid616SequencerUiState,
+): Grid616SequencerUiState {
+    if (json == null) return defaultState
+
+    val defaultTrack = Grid616TrackState(note = 24)
+    val tracks = (json.optJSONArray("tracks") ?: JSONArray()).let { tracksJson ->
+        buildList {
+            for (i in 0 until tracksJson.length()) {
+                val trackJson = tracksJson.optJSONObject(i) ?: continue
+                add(grid616TrackStateFromJsonObject(trackJson, defaultTrack))
+            }
+        }
+    }
+
+    return defaultState.copy(
+        midiChannel = json.optInt("midiChannel", defaultState.midiChannel),
+        swingAmount = json.optDouble("swingAmount", defaultState.swingAmount.toDouble()).toFloat(),
+        playbackMode = enumValueOrDefault(
+            rawName = json.optString("playbackMode", defaultState.playbackMode.name),
+            default = defaultState.playbackMode,
+        ),
+        tracks = tracks,
+    ).normalized()
+}
+
+private fun grid616TrackStateFromJsonObject(
+    json: JSONObject,
+    defaultState: Grid616TrackState,
+): Grid616TrackState {
+    val steps = (json.optJSONArray("steps") ?: JSONArray()).let { stepsJson ->
+        buildList {
+            for (i in 0 until stepsJson.length()) {
+                val stepJson = stepsJson.optJSONObject(i) ?: continue
+                add(grid616StepStateFromJsonObject(stepJson, Grid616StepState()))
+            }
+        }
+    }
+
+    return defaultState.copy(
+        note = json.optInt("note", defaultState.note),
+        muted = json.optBoolean("muted", defaultState.muted),
+        length = json.optInt("length", defaultState.length),
+        steps = steps,
+    )
+}
+
+private fun grid616StepStateFromJsonObject(
+    json: JSONObject,
+    defaultState: Grid616StepState,
+): Grid616StepState = defaultState.copy(
+    enabled = json.optBoolean("enabled", defaultState.enabled),
+    velocity = json.optInt("velocity", defaultState.velocity),
+    delayTicks = json.optInt("delayTicks", defaultState.delayTicks),
+)
 
 private inline fun <reified T : Enum<T>> enumValueOrDefault(rawName: String?, default: T): T {
     if (rawName.isNullOrBlank()) return default
