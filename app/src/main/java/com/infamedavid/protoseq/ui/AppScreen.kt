@@ -12,14 +12,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,7 +57,6 @@ import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
-import com.infamedavid.protoseq.ui.components.ProtoButton
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
@@ -158,47 +157,53 @@ fun AppScreen(
                     .padding(vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Slider(
-                    value = ((transportState.bpm - 1f) / 299f).coerceIn(0f, 1f),
-                    onValueChange = { normalized ->
-                        transportViewModel.setBpm(1f + (normalized * 299f))
-                    },
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary,
-                        inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
-                    )
-                )
-
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    OutlinedButton(
-                        onClick = { transportViewModel.setBpm(transportState.bpm - 1f) },
-                        shape = ProtoControlShape
-                    ) {
-                        Text(text = "-")
-                    }
-
-                    Text(
-                        text = "${transportState.bpm.toInt()} BPM",
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                bpmInputText = transportState.bpm.toInt().toString()
-                                showBpmInputDialog = true
-                            }
-                            .padding(vertical = 12.dp),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                    Slider(
+                        modifier = Modifier.weight(1f),
+                        value = ((transportState.bpm - 1f) / 299f).coerceIn(0f, 1f),
+                        onValueChange = { normalized ->
+                            transportViewModel.setBpm(1f + (normalized * 299f))
+                        },
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary,
+                            inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     )
 
-                    OutlinedButton(
-                        onClick = { transportViewModel.setBpm(transportState.bpm + 1f) },
-                        shape = ProtoControlShape
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "+")
+                        OutlinedButton(
+                            onClick = { transportViewModel.setBpm(transportState.bpm - 1f) },
+                            modifier = Modifier.height(40.dp),
+                            shape = ProtoControlShape
+                        ) {
+                            Text(text = "-")
+                        }
+
+                        Text(
+                            text = "${transportState.bpm.toInt()} BPM",
+                            modifier = Modifier.clickable {
+                                bpmInputText = transportState.bpm.toInt().toString()
+                                showBpmInputDialog = true
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+
+                        OutlinedButton(
+                            onClick = { transportViewModel.setBpm(transportState.bpm + 1f) },
+                            modifier = Modifier.height(40.dp),
+                            shape = ProtoControlShape
+                        ) {
+                            Text(text = "+")
+                        }
                     }
                 }
 
@@ -206,25 +211,34 @@ fun AppScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    ProtoButton(
-                        label = "PLAY",
-                        modifier = Modifier.weight(1f)
+                    OutlinedButton(
+                        onClick = { transportViewModel.play() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        shape = ProtoControlShape
                     ) {
-                        transportViewModel.play()
+                        Text(text = "PLAY")
                     }
 
-                    ProtoButton(
-                        label = "STOP",
-                        modifier = Modifier.weight(1f)
+                    OutlinedButton(
+                        onClick = { transportViewModel.stop() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        shape = ProtoControlShape
                     ) {
-                        transportViewModel.stop()
+                        Text(text = "STOP")
                     }
 
-                    ProtoButton(
-                        label = "PAUS",
-                        modifier = Modifier.weight(1f)
+                    OutlinedButton(
+                        onClick = { transportViewModel.pause() },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(40.dp),
+                        shape = ProtoControlShape
                     ) {
-                        transportViewModel.pause()
+                        Text(text = "PAUS")
                     }
                 }
 
@@ -265,38 +279,6 @@ fun AppScreen(
                     }
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    ProtoButton(
-                        label = "SAVE",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        presetNameInput = ""
-                        saveDialogValidationMessage = ""
-                        showSaveStateDialog = true
-                    }
-
-                    ProtoButton(
-                        label = "LOAD",
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        sessionStore.listPresets()
-                            .onSuccess { presets ->
-                                savedPresets = presets
-                                if (presets.isEmpty()) {
-                                    sessionStatusMessage = "No saved presets found"
-                                } else {
-                                    showLoadStateDialog = true
-                                }
-                            }
-                            .onFailure {
-                                sessionStatusMessage = "Could not load preset"
-                            }
-                    }
-                }
-
                 if (sessionStatusMessage.isNotBlank()) {
                     Text(
                         text = sessionStatusMessage,
@@ -317,18 +299,8 @@ fun AppScreen(
             )
             Spacer(modifier = Modifier.height(10.dp))
 
-            PageHeader(
+            SelectedSlotHeader(
                 pageIndex = currentPage.pageIndex,
-                enabled = currentPage.enabled,
-                onToggleEnabled = {
-                    sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
-                        page.copy(enabled = !page.enabled)
-                    }
-                }
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            SequencerSelector(
                 selectedSequencerType = currentPage.selectedSequencerType,
                 onSelectType = { selectedType ->
                     if (
@@ -344,8 +316,14 @@ fun AppScreen(
                 onResetParameters = {
                     updateCurrentTuringState { StochasticSequencerUiState() }
                 },
-                modifier = Modifier.fillMaxWidth()
+                enabled = currentPage.enabled,
+                onToggleEnabled = {
+                    sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                        page.copy(enabled = !page.enabled)
+                    }
+                }
             )
+            Spacer(modifier = Modifier.height(8.dp))
 
             when (currentPage.selectedSequencerType) {
                 SequencerType.EMPTY -> {
@@ -485,24 +463,56 @@ fun AppScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                    .padding(top = 8.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = { showAboutDialog = true },
-                    modifier = Modifier
-                        .width(50.dp)
-                        .height(44.dp),
-                    shape = ProtoControlShape,
-                    contentPadding = PaddingValues(0.dp)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.protoseq_mark),
-                        contentDescription = "About",
-                        modifier = Modifier.size(34.dp)
-                    )
+                    OutlinedButton(
+                        onClick = {
+                            presetNameInput = ""
+                            saveDialogValidationMessage = ""
+                            showSaveStateDialog = true
+                        },
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        shape = ProtoControlShape
+                    ) {
+                        Text(text = "SAVE")
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            sessionStore.listPresets()
+                                .onSuccess { presets ->
+                                    savedPresets = presets
+                                    if (presets.isEmpty()) {
+                                        sessionStatusMessage = "No saved presets found"
+                                    } else {
+                                        showLoadStateDialog = true
+                                    }
+                                }
+                                .onFailure {
+                                    sessionStatusMessage = "Could not load preset"
+                                }
+                        },
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        shape = ProtoControlShape
+                    ) {
+                        Text(text = "LOAD")
+                    }
+
+                    OutlinedButton(
+                        onClick = { showAboutDialog = true },
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        shape = ProtoControlShape
+                    ) {
+                        Text(text = "ABOUT")
+                    }
                 }
+
+                Spacer(modifier = Modifier.weight(1f))
 
                 Image(
                     painter = painterResource(id = R.drawable.protoseq_wordmark),
@@ -781,48 +791,56 @@ private fun PageTabs(
                 },
                 modifier = Modifier.weight(1f)
             ) {
-                Text(text = "P${pageIndex + 1}")
+                Text(text = "SLT${pageIndex + 1}")
             }
         }
     }
 }
 
 @Composable
-private fun SequencerSelector(
+private fun SelectedSlotHeader(
+    pageIndex: Int,
     selectedSequencerType: SequencerType,
     onSelectType: (SequencerType) -> Unit,
     onResetParameters: () -> Unit,
+    enabled: Boolean,
+    onToggleEnabled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+    var expanded by remember { mutableStateOf(false) }
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
-            text = "Sequencer",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            text = "SLOT ${pageIndex + 1}",
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
         )
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            SequencerType.entries.forEach { sequencerType ->
-                val isSelected = selectedSequencerType == sequencerType
-                OutlinedButton(
-                    onClick = { onSelectType(sequencerType) },
-                    shape = ProtoControlShape,
-                    colors = if (isSelected) {
-                        ButtonDefaults.outlinedButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                        )
-                    } else {
-                        ButtonDefaults.outlinedButtonColors()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(text = sequencerType.label)
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedButton(
+                onClick = { expanded = true },
+                modifier = Modifier.fillMaxWidth(),
+                shape = ProtoControlShape
+            ) {
+                Text(text = selectedSequencerType.label)
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                SequencerType.entries.forEach { sequencerType ->
+                    DropdownMenuItem(
+                        text = { Text(text = sequencerType.label) },
+                        onClick = {
+                            expanded = false
+                            onSelectType(sequencerType)
+                        }
+                    )
                 }
             }
         }
@@ -830,33 +848,15 @@ private fun SequencerSelector(
         OutlinedButton(
             onClick = onResetParameters,
             enabled = selectedSequencerType == SequencerType.TURING_MACHINE,
+            modifier = Modifier.height(40.dp),
             shape = ProtoControlShape
         ) {
-            Text(text = "Reset Parameters")
+            Text(text = "RESET")
         }
-    }
-}
-
-@Composable
-private fun PageHeader(
-    pageIndex: Int,
-    enabled: Boolean,
-    onToggleEnabled: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = "Page ${pageIndex + 1}",
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
 
         OutlinedButton(
             onClick = onToggleEnabled,
+            modifier = Modifier.height(40.dp),
             shape = ProtoControlShape
         ) {
             Text(text = if (enabled) "ON" else "OFF")
