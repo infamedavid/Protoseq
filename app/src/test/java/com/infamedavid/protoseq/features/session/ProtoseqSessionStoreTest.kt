@@ -8,11 +8,14 @@ import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_DELAY_TICKS
 import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_TRACK_LENGTH
 import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_VELOCITY
 import com.infamedavid.protoseq.features.grid616.GRID_616_TRACK_COUNT
+import com.infamedavid.protoseq.features.grid616.GRID_616_CRPT_SLOT_COUNT
 import com.infamedavid.protoseq.features.grid616.Grid616CrptState
+import com.infamedavid.protoseq.features.grid616.Grid616CrptSlotState
 import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.defaultGrid616Tracks
 import com.infamedavid.protoseq.features.grid616.withSavedCrptSnapshot
 import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.ProtoseqSessionState
@@ -535,7 +538,7 @@ class ProtoseqSessionStoreTest {
         val crpt = decoded.pages[0].grid616State.crptState
 
         assertEquals(0f, crpt.rndmAmount)
-        assertNull(crpt.snapshot)
+        assertTrue(crpt.slots.all { it.snapshot == null })
     }
 
     @Test
@@ -557,7 +560,7 @@ class ProtoseqSessionStoreTest {
                     )
                 }
             )
-            val savedGrid = patternGrid.withSavedCrptSnapshot()
+            val savedGrid = patternGrid.withSavedCrptSnapshot(0)
             val modifiedGrid = savedGrid.copy(
                 crptState = savedGrid.crptState.copy(rndmAmount = 0.5f),
             )
@@ -570,7 +573,7 @@ class ProtoseqSessionStoreTest {
 
         val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
         val crpt = decoded.pages[0].grid616State.crptState
-        val snapshot = crpt.snapshot
+        val snapshot = crpt.slots[0].snapshot
 
         assertEquals(0.5f, crpt.rndmAmount)
         assertNotNull(snapshot)
@@ -583,13 +586,48 @@ class ProtoseqSessionStoreTest {
     }
 
     @Test
+    fun grid616CrptSlotsRoundTripPreservesSlotZeroAndFiveAndRndmAmount() {
+        val source = Grid616SequencerUiState(
+            tracks = defaultGrid616Tracks().map { it.copy(note = 61) }
+        )
+        val sourceTwo = Grid616SequencerUiState(
+            tracks = defaultGrid616Tracks().map { it.copy(note = 77) }
+        )
+        val crptWithTwoSlots = Grid616CrptState(
+            rndmAmount = 0.35f,
+            slots = List(GRID_616_CRPT_SLOT_COUNT) { index ->
+                when (index) {
+                    0 -> Grid616CrptSlotState(snapshot = source.toCrptSnapshot())
+                    5 -> Grid616CrptSlotState(snapshot = sourceTwo.toCrptSnapshot())
+                    else -> Grid616CrptSlotState()
+                }
+            }
+        )
+
+        val session = ProtoseqSessionState().updatePage(0) { page ->
+            page.copy(
+                selectedSequencerType = SequencerType.GRID_616,
+                grid616State = page.grid616State.copy(crptState = crptWithTwoSlots),
+            )
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val crpt = decoded.pages[0].grid616State.crptState
+
+        assertEquals(GRID_616_CRPT_SLOT_COUNT, crpt.slots.size)
+        assertEquals(0.35f, crpt.rndmAmount)
+        assertEquals(61, crpt.slots[0].snapshot!!.tracks[0].note)
+        assertEquals(77, crpt.slots[5].snapshot!!.tracks[0].note)
+    }
+
+    @Test
     fun grid616CrptSnapshotExcludesMuteWhileGridTrackMuteStillRoundTrips() {
         val session = ProtoseqSessionState().updatePage(0) { page ->
             val mutatedGrid = page.grid616State.copy(
                 tracks = page.grid616State.tracks.toMutableList().apply {
                     this[0] = this[0].copy(muted = true)
                 },
-            ).withSavedCrptSnapshot()
+            ).withSavedCrptSnapshot(0)
 
             page.copy(
                 selectedSequencerType = SequencerType.GRID_616,
@@ -601,7 +639,7 @@ class ProtoseqSessionStoreTest {
         val grid = decoded.pages[0].grid616State
 
         assertTrue(grid.tracks[0].muted)
-        assertNotNull(grid.crptState.snapshot)
+        assertNotNull(grid.crptState.slots[0].snapshot)
     }
 
     @Test
@@ -629,6 +667,51 @@ class ProtoseqSessionStoreTest {
         val decoded = protoseqSessionStateFromJsonObject(json)
 
         assertEquals(Grid616CrptState(), decoded.pages[0].grid616State.crptState)
+        assertTrue(decoded.pages[0].grid616State.crptState.slots.all { it.snapshot == null })
+    }
+
+    @Test
+    fun legacyGrid616CrptSnapshotMigratesIntoSlotZero() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "crptState",
+                                    JSONObject()
+                                        .put("rndmAmount", 0.5)
+                                        .put(
+                                            "snapshot",
+                                            JSONObject().put(
+                                                "tracks",
+                                                JSONArray().put(
+                                                    JSONObject()
+                                                        .put("note", 72)
+                                                        .put("length", 8)
+                                                        .put("playbackMode", Grid616PlaybackMode.FORWARD.name)
+                                                        .put("steps", JSONArray())
+                                                )
+                                            )
+                                        )
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        val crpt = decoded.pages[0].grid616State.crptState
+
+        assertEquals(0.5f, crpt.rndmAmount)
+        assertEquals(72, crpt.slots[0].snapshot!!.tracks[0].note)
+        assertTrue(crpt.slots.drop(1).all { it.snapshot == null })
     }
 
     @Test
@@ -659,7 +742,7 @@ class ProtoseqSessionStoreTest {
         val crpt = decoded.pages[0].grid616State.crptState
 
         assertEquals(0.8f, crpt.rndmAmount)
-        assertNull(crpt.snapshot)
+        assertTrue(crpt.slots.all { it.snapshot == null })
     }
 
     @Test
@@ -707,7 +790,7 @@ class ProtoseqSessionStoreTest {
             )
 
         val decoded = protoseqSessionStateFromJsonObject(json)
-        val snapshot = decoded.pages[0].grid616State.crptState.snapshot!!
+        val snapshot = decoded.pages[0].grid616State.crptState.slots[0].snapshot!!
         val track = snapshot.tracks[0]
         val step = track.steps[0]
 
@@ -840,8 +923,8 @@ class ProtoseqSessionStoreTest {
         val decodedFew = protoseqSessionStateFromJsonObject(jsonWithTooFew)
         val decodedMany = protoseqSessionStateFromJsonObject(jsonWithTooMany)
 
-        val fewSnapshot = decodedFew.pages[0].grid616State.crptState.snapshot!!
-        val manySnapshot = decodedMany.pages[0].grid616State.crptState.snapshot!!
+        val fewSnapshot = decodedFew.pages[0].grid616State.crptState.slots[0].snapshot!!
+        val manySnapshot = decodedMany.pages[0].grid616State.crptState.slots[0].snapshot!!
 
         assertEquals(GRID_616_TRACK_COUNT, fewSnapshot.tracks.size)
         assertTrue(fewSnapshot.tracks.all { it.steps.size == GRID_616_MAX_STEPS })

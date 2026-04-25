@@ -9,6 +9,7 @@ import com.infamedavid.protoseq.features.grid616.Grid616CrptSnapshot
 import com.infamedavid.protoseq.features.grid616.Grid616CrptState
 import com.infamedavid.protoseq.features.grid616.Grid616CrptStepSnapshot
 import com.infamedavid.protoseq.features.grid616.Grid616CrptTrackSnapshot
+import com.infamedavid.protoseq.features.grid616.Grid616CrptSlotState
 import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.PROTOSEQ_SESSION_STATE_VERSION
@@ -334,6 +335,16 @@ private fun Grid616StepState.toJsonObject(): JSONObject = JSONObject()
 
 private fun Grid616CrptState.toJsonObject(): JSONObject = JSONObject()
     .put("rndmAmount", rndmAmount)
+    .put(
+        "slots",
+        JSONArray().apply {
+            slots.forEach { slot ->
+                put(slot.toJsonObject())
+            }
+        }
+    )
+
+private fun Grid616CrptSlotState.toJsonObject(): JSONObject = JSONObject()
     .put("snapshot", snapshot?.toJsonObject() ?: JSONObject.NULL)
 
 private fun Grid616CrptSnapshot.toJsonObject(): JSONObject = JSONObject()
@@ -439,17 +450,44 @@ private fun grid616CrptStateFromJsonObject(
 ): Grid616CrptState {
     if (json == null) return defaultState
 
-    val snapshot = when {
-        !json.has("snapshot") -> defaultState.snapshot
-        json.isNull("snapshot") -> null
-        else -> grid616CrptSnapshotFromJsonObject(json.optJSONObject("snapshot"))
+    val slots = when {
+        json.has("slots") -> {
+            val slotsJson = json.optJSONArray("slots") ?: JSONArray()
+            buildList {
+                for (i in 0 until slotsJson.length()) {
+                    val slotJson = slotsJson.optJSONObject(i)
+                    add(grid616CrptSlotStateFromJsonObject(slotJson))
+                }
+            }
+        }
+        json.has("snapshot") -> {
+            val legacySnapshot = when {
+                json.isNull("snapshot") -> null
+                else -> grid616CrptSnapshotFromJsonObject(json.optJSONObject("snapshot"))
+            }
+            listOf(Grid616CrptSlotState(snapshot = legacySnapshot))
+        }
+        else -> defaultState.slots
     }
 
     return defaultState.copy(
         rndmAmount = json.optDouble("rndmAmount", defaultState.rndmAmount.toDouble()).toFloat(),
-        snapshot = snapshot,
+        slots = slots,
     ).normalized()
 }
+
+private fun grid616CrptSlotStateFromJsonObject(json: JSONObject?): Grid616CrptSlotState =
+    if (json == null) {
+        Grid616CrptSlotState()
+    } else {
+        Grid616CrptSlotState(
+            snapshot = when {
+                !json.has("snapshot") -> null
+                json.isNull("snapshot") -> null
+                else -> grid616CrptSnapshotFromJsonObject(json.optJSONObject("snapshot"))
+            }
+        ).normalized()
+    }
 
 private fun grid616CrptSnapshotFromJsonObject(json: JSONObject?): Grid616CrptSnapshot? {
     if (json == null) return null
