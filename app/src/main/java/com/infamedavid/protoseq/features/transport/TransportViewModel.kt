@@ -18,6 +18,11 @@ import com.infamedavid.protoseq.core.repeater.RptrConfig
 import com.infamedavid.protoseq.core.repeater.RptrDivision
 import com.infamedavid.protoseq.core.repeater.RptrMidiOut
 import com.infamedavid.protoseq.core.repeater.RptrState
+import com.infamedavid.protoseq.features.grid616.GRID_616_GATE_TICKS
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_DELAY_TICKS
+import com.infamedavid.protoseq.features.grid616.GRID_616_TICKS_PER_STEP
+import com.infamedavid.protoseq.features.grid616.Grid616SequencerConfig
+import com.infamedavid.protoseq.features.grid616.resolveGrid616StepIndex
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
@@ -33,6 +38,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 class TransportViewModel(
     private val clockEngine: ClockEngine = ClockEngine(),
@@ -44,7 +50,9 @@ class TransportViewModel(
     private val vmScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val runtimeMutex = Mutex()
     private val activeTuringPageConfigs = mutableMapOf<Int, StochasticSequencerConfig>()
+    private val activeGrid616PageConfigs = mutableMapOf<Int, Grid616SequencerConfig>()
     private val pageRuntimes = mutableMapOf<Int, PageRuntime>()
+    private val grid616PageRuntimes = mutableMapOf<Int, Grid616PageRuntime>()
     private val activeMidiNotes = ActiveMidiNoteRegistry()
     private var latestClockTick: Long = 1L
 
@@ -84,6 +92,7 @@ class TransportViewModel(
                         }
                         processCcSlewTick(runtime, config)
                     }
+                    processGrid616TickLocked(tick)
                     syncRptrUiState()
                 }
                 if (tick % 4L == 0L) {
@@ -129,6 +138,11 @@ class TransportViewModel(
                             runtime.sequencerEngine.reset()
                             runtime.repeaterEngine.reset()
                         }
+                        grid616PageRuntimes.values.forEach { runtime ->
+                            clearGrid616ScheduledEvents(runtime)
+                            runtime.globalStepCounter = 0L
+                            runtime.lastProcessedStepTick = null
+                        }
                         syncRptrUiState()
                         clockEngine.playFromStart()
                         midiEngine.sendStart()
@@ -157,6 +171,7 @@ class TransportViewModel(
                             sendAndClearPendingNoteOffs(runtime)
                             clearCcSlewState(runtime)
                         }
+                        resetAllGrid616RuntimesLocked()
                         releaseAllNotesLocked()
                         syncRptrUiState()
                         clockEngine.stop()
@@ -210,8 +225,36 @@ class TransportViewModel(
         vmScope.launch {
             runtimeMutex.withLock {
                 activeTuringPageConfigs.remove(pageIndex)
+                activeGrid616PageConfigs.remove(pageIndex)
                 clearPageRuntimeLocked(pageIndex)
+                clearGrid616PageRuntimeLocked(pageIndex)
                 syncRptrUiState()
+            }
+        }
+    }
+
+    fun updateGrid616PageConfigs(configs: List<Grid616PageConfig>) {
+        vmScope.launch {
+            runtimeMutex.withLock {
+                val nextConfigsByPage = configs.associate { it.pageIndex to it.config }
+                val removedPageIndexes = activeGrid616PageConfigs.keys - nextConfigsByPage.keys
+                removedPageIndexes.forEach { pageIndex ->
+                    activeGrid616PageConfigs.remove(pageIndex)
+                    clearGrid616PageRuntimeLocked(pageIndex)
+                }
+
+                nextConfigsByPage.forEach { (pageIndex, nextConfig) ->
+                    val previousConfig = activeGrid616PageConfigs[pageIndex]
+                    if (previousConfig != nextConfig) {
+                        clearGrid616PageRuntimeLocked(pageIndex)
+                        grid616PageRuntimes[pageIndex] = Grid616PageRuntime(pageIndex = pageIndex)
+                    } else {
+                        grid616PageRuntimes.getOrPut(pageIndex) { Grid616PageRuntime(pageIndex = pageIndex) }
+                    }
+                }
+
+                activeGrid616PageConfigs.clear()
+                activeGrid616PageConfigs.putAll(nextConfigsByPage)
             }
         }
     }
@@ -275,6 +318,99 @@ class TransportViewModel(
                 if (routeResult.passThrough) {
                     releasePageNoteLocked(pageIndex, scheduled.channel, scheduled.note)
                 }
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun processGrid616TickLocked(currentTick: Long) {
+        grid616PageRuntimes.forEach { (pageIndex, runtime) ->
+            val config = activeGrid616PageConfigs[pageIndex] ?: return@forEach
+            processDueGrid616NoteOffsLocked(pageIndex, runtime, currentTick)
+            processDueGrid616TriggersLocked(pageIndex, runtime, currentTick)
+
+            if (!isGrid616StepTick(currentTick) || runtime.lastProcessedStepTick == currentTick) return@forEach
+
+            runtime.lastProcessedStepTick = currentTick
+            val swingDelayTicks = if (runtime.globalStepCounter % 2L == 1L) {
+                (config.swingAmount * 12f).roundToInt()
+            } else {
+                0
+            }.coerceIn(0, GRID_616_MAX_DELAY_TICKS)
+
+            config.tracks.forEach { track ->
+                if (track.muted) return@forEach
+                val stepIndex = resolveGrid616StepIndex(
+                    globalStepCounter = runtime.globalStepCounter,
+                    length = track.length,
+                    playbackMode = track.playbackMode,
+                    randomIndexProvider = { length -> Random.nextInt(until = length) }
+                )
+                val step = track.steps.getOrNull(stepIndex) ?: return@forEach
+                if (!step.enabled) return@forEach
+
+                val finalDelayTicks = (swingDelayTicks + step.delayTicks).coerceIn(0, GRID_616_MAX_DELAY_TICKS)
+                val dueTick = currentTick + finalDelayTicks
+                val trigger = Grid616ScheduledTrigger(
+                    dueTick = dueTick,
+                    channel = config.midiChannel,
+                    note = track.note,
+                    velocity = step.velocity
+                )
+                if (dueTick == currentTick) {
+                    fireGrid616TriggerLocked(pageIndex, runtime, trigger)
+                } else {
+                    runtime.scheduledTriggers += trigger
+                }
+            }
+
+            runtime.globalStepCounter += 1L
+        }
+    }
+
+    private fun processDueGrid616TriggersLocked(
+        pageIndex: Int,
+        runtime: Grid616PageRuntime,
+        currentTick: Long
+    ) {
+        val iterator = runtime.scheduledTriggers.iterator()
+        while (iterator.hasNext()) {
+            val scheduled = iterator.next()
+            if (scheduled.dueTick <= currentTick) {
+                fireGrid616TriggerLocked(pageIndex, runtime, scheduled)
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun fireGrid616TriggerLocked(
+        pageIndex: Int,
+        runtime: Grid616PageRuntime,
+        trigger: Grid616ScheduledTrigger
+    ) {
+        sendPageNoteOnLocked(
+            pageIndex = pageIndex,
+            channel = trigger.channel,
+            note = trigger.note,
+            velocity = trigger.velocity
+        )
+        runtime.scheduledNoteOffs += Grid616ScheduledNoteOff(
+            dueTick = trigger.dueTick + GRID_616_GATE_TICKS,
+            channel = trigger.channel,
+            note = trigger.note
+        )
+    }
+
+    private fun processDueGrid616NoteOffsLocked(
+        pageIndex: Int,
+        runtime: Grid616PageRuntime,
+        currentTick: Long
+    ) {
+        val iterator = runtime.scheduledNoteOffs.iterator()
+        while (iterator.hasNext()) {
+            val scheduled = iterator.next()
+            if (scheduled.dueTick <= currentTick) {
+                releasePageNoteLocked(pageIndex, scheduled.channel, scheduled.note)
                 iterator.remove()
             }
         }
@@ -446,6 +582,33 @@ class TransportViewModel(
         }
     }
 
+    private fun isGrid616StepTick(tick: Long): Boolean = ((tick - 1L) % GRID_616_TICKS_PER_STEP.toLong()) == 0L
+
+    private fun clearGrid616ScheduledEvents(runtime: Grid616PageRuntime) {
+        runtime.scheduledTriggers.clear()
+        runtime.scheduledNoteOffs.clear()
+    }
+
+    private fun clearGrid616PageRuntimeLocked(pageIndex: Int) {
+        grid616PageRuntimes.remove(pageIndex)?.let { runtime ->
+            clearGrid616ScheduledEvents(runtime)
+            releasePageNotesLocked(pageIndex)
+        }
+    }
+
+    private fun resetAllGrid616RuntimesLocked() {
+        grid616PageRuntimes.values.forEach { runtime ->
+            clearGrid616ScheduledEvents(runtime)
+            runtime.globalStepCounter = 0L
+            runtime.lastProcessedStepTick = null
+        }
+    }
+
+    private fun clearAllGrid616RuntimesLocked() {
+        val pageIndexes = grid616PageRuntimes.keys.toList()
+        pageIndexes.forEach(::clearGrid616PageRuntimeLocked)
+    }
+
     private fun syncRptrUiState() {
         val statesByPage = mutableMapOf<Int, RptrUiRuntimeState>()
         val activeDivisionsByPage = mutableMapOf<Int, RptrDivision?>()
@@ -476,6 +639,7 @@ class TransportViewModel(
                     sendRepeaterMidi(runtime.pageIndex, stopResult.midi)
                     sendAndClearPendingNoteOffs(runtime)
                 }
+                clearAllGrid616RuntimesLocked()
                 releaseAllNotesLocked()
                 syncRptrUiState()
             }
@@ -523,6 +687,27 @@ class TransportViewModel(
         val note: Int
     )
 
+    private data class Grid616ScheduledTrigger(
+        val dueTick: Long,
+        val channel: Int,
+        val note: Int,
+        val velocity: Int
+    )
+
+    private data class Grid616ScheduledNoteOff(
+        val dueTick: Long,
+        val channel: Int,
+        val note: Int
+    )
+
+    private data class Grid616PageRuntime(
+        val pageIndex: Int,
+        var lastProcessedStepTick: Long? = null,
+        var globalStepCounter: Long = 0L,
+        val scheduledTriggers: MutableList<Grid616ScheduledTrigger> = mutableListOf(),
+        val scheduledNoteOffs: MutableList<Grid616ScheduledNoteOff> = mutableListOf()
+    )
+
     private data class PageRuntime(
         val pageIndex: Int,
         val sequencerEngine: StochasticSequencerEngine = StochasticSequencerEngine(),
@@ -536,4 +721,9 @@ class TransportViewModel(
 data class TuringPageConfig(
     val pageIndex: Int,
     val config: StochasticSequencerConfig
+)
+
+data class Grid616PageConfig(
+    val pageIndex: Int,
+    val config: Grid616SequencerConfig
 )
