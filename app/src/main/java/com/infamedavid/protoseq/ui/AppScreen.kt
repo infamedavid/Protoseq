@@ -48,6 +48,7 @@ import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.session.ProtoseqSessionPresetSummary
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
+import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.features.session.ProtoseqSessionStore
 import com.infamedavid.protoseq.features.sequencer.SequencerType
 import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionState
@@ -60,6 +61,7 @@ import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
+import com.infamedavid.protoseq.ui.sequencers.Grid616Panel
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
@@ -484,18 +486,17 @@ fun AppScreen() {
                 }
 
                 SequencerType.GRID_616 -> {
-                    Box(
+                    Grid616Panel(
+                        state = currentPage.grid616State,
+                        onStateChange = { nextState ->
+                            sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                                page.copy(grid616State = nextState.normalized())
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = "GRID 616 editor coming next.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+                            .padding(vertical = 12.dp)
+                    )
                 }
             }
 
