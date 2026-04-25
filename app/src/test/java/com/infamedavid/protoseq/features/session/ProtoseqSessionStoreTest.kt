@@ -8,6 +8,7 @@ import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -161,5 +162,43 @@ class ProtoseqSessionStoreTest {
         assertEquals(DEFAULT_PROTOSEQ_PAGE_COUNT, decoded.pages.size)
         assertEquals(4, decoded.selectedPageIndex)
         assertTrue(decoded.pages[0].enabled)
+    }
+
+    @Test
+    fun sessionJsonContainsEditableStateAndExcludesRuntimeState() {
+        val session = ProtoseqSessionState(selectedPageIndex = 3)
+            .updatePage(0) { page ->
+                page.copy(
+                    enabled = true,
+                    selectedSequencerType = SequencerType.TURING_MACHINE,
+                )
+            }
+
+        val json = session.toJsonObject()
+        val serialized = json.toString()
+
+        assertTrue(json.has("version"))
+        assertTrue(json.has("selectedPageIndex"))
+        assertTrue(json.has("pages"))
+
+        assertTrue(serialized.contains("\"enabled\""))
+        assertTrue(serialized.contains("\"selectedSequencerType\""))
+        assertTrue(serialized.contains("\"turingState\""))
+
+        val forbiddenRuntimeKeys = listOf(
+            "pageRuntimes",
+            "scheduledNoteOffs",
+            "activeCcSlew",
+            "rptrStatesByPage",
+            "activeRptrDivisionsByPage",
+            "playing",
+            "selectedMidiOutputId",
+            "clockPosition",
+            "activeMidiNotes",
+        )
+
+        forbiddenRuntimeKeys.forEach { key ->
+            assertFalse("Unexpected runtime key found in session JSON: $key", serialized.contains("\"$key\""))
+        }
     }
 }
