@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -44,12 +48,13 @@ import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
 import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
-import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
 private val Grid616StepCellSize = 20.dp
 private val Grid616GridSpacing = 4.dp
 private val Grid616StepNumberWidth = 34.dp
+private val Grid616TrackControlWidth = 40.dp
+private val Grid616TrackColumnWidth = 36.dp
 
 @Composable
 fun Grid616Panel(
@@ -64,6 +69,7 @@ fun Grid616Panel(
     var noteDraft by remember { mutableStateOf(60) }
     var editingTrackLengthIndex by remember { mutableStateOf<Int?>(null) }
     var lengthDraft by remember { mutableStateOf(GRID_616_MAX_STEPS) }
+    var editingTrackModeIndex by remember { mutableStateOf<Int?>(null) }
 
     fun applyState(nextState: Grid616SequencerUiState) {
         onStateChange(nextState.normalized())
@@ -71,16 +77,15 @@ fun Grid616Panel(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Top
         ) {
-            ProtoValueField(
-                label = "CHNL",
-                value = state.midiChannel.toString(),
+            CompactChannelControl(
+                channel = state.midiChannel,
                 onDecrement = {
                     val next = if (state.midiChannel <= 1) 16 else state.midiChannel - 1
                     applyState(state.copy(midiChannel = next))
@@ -89,33 +94,39 @@ fun Grid616Panel(
                     val next = if (state.midiChannel >= 16) 1 else state.midiChannel + 1
                     applyState(state.copy(midiChannel = next))
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.width(124.dp)
             )
 
             Column(
-                modifier = Modifier.weight(1.2f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text(
-                    text = "SWING",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SWING",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${(state.swingAmount * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Slider(
                     value = state.swingAmount,
                     onValueChange = { value ->
                         applyState(state.copy(swingAmount = value.coerceIn(0f, 0.75f)))
                     },
                     valueRange = 0f..0.75f,
-                    steps = 2
-                )
-                Text(
-                    text = "${(state.swingAmount * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    steps = 2,
+                    modifier = Modifier.height(28.dp)
                 )
             }
-
         }
 
         Row(
@@ -125,7 +136,7 @@ fun Grid616Panel(
         ) {
             Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
             state.tracks.forEachIndexed { trackIndex, track ->
-                TrackHeader(
+                TrackTopControls(
                     trackIndex = trackIndex,
                     track = track,
                     onEditNote = {
@@ -136,17 +147,7 @@ fun Grid616Panel(
                         editingTrackLengthIndex = trackIndex
                         lengthDraft = track.length
                     },
-                    onToggleMute = {
-                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
-                    },
-                    onCyclePlaybackMode = {
-                        applyState(
-                            state.updateTrack(trackIndex) { trackState ->
-                                trackState.copy(playbackMode = trackState.playbackMode.next())
-                            }
-                        )
-                    },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.width(Grid616TrackColumnWidth)
                 )
             }
         }
@@ -188,10 +189,42 @@ fun Grid616Panel(
                                 velocityDraft = step.velocity.toFloat()
                                 delayDraft = step.delayTicks.toFloat()
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.width(Grid616TrackColumnWidth)
                         )
                     }
                 }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
+        ) {
+            Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
+            state.tracks.forEachIndexed { trackIndex, track ->
+                TrackBottomControls(
+                    track = track,
+                    modeMenuExpanded = editingTrackModeIndex == trackIndex,
+                    onOpenModeMenu = { editingTrackModeIndex = trackIndex },
+                    onDismissModeMenu = {
+                        if (editingTrackModeIndex == trackIndex) {
+                            editingTrackModeIndex = null
+                        }
+                    },
+                    onSelectPlaybackMode = { selectedMode ->
+                        applyState(
+                            state.updateTrack(trackIndex) { trackState ->
+                                trackState.copy(playbackMode = selectedMode)
+                            }
+                        )
+                        editingTrackModeIndex = null
+                    },
+                    onToggleMute = {
+                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
+                    },
+                    modifier = Modifier.width(Grid616TrackColumnWidth)
+                )
             }
         }
     }
@@ -278,16 +311,28 @@ fun Grid616Panel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedButton(
+                            onClick = { noteDraft = (noteDraft - 12).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("-12")
+                        }
+                        OutlinedButton(
                             onClick = { noteDraft = (noteDraft - 1).coerceIn(0, 127) },
                             shape = ProtoControlShape
                         ) {
-                            Text("-")
+                            Text("-1")
                         }
                         OutlinedButton(
                             onClick = { noteDraft = (noteDraft + 1).coerceIn(0, 127) },
                             shape = ProtoControlShape
                         ) {
-                            Text("+")
+                            Text("+1")
+                        }
+                        OutlinedButton(
+                            onClick = { noteDraft = (noteDraft + 12).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("+12")
                         }
                     }
                 }
@@ -367,13 +412,72 @@ fun Grid616Panel(
 }
 
 @Composable
-private fun TrackHeader(
+private fun CompactChannelControl(
+    channel: Int,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "CHNL",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = channel.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(
+                onClick = onDecrement,
+                shape = ProtoControlShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(34.dp)
+            ) {
+                Text("-")
+            }
+
+            Spacer(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(34.dp)
+            )
+
+            OutlinedButton(
+                onClick = onIncrement,
+                shape = ProtoControlShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(34.dp)
+            ) {
+                Text("+")
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackTopControls(
     trackIndex: Int,
     track: Grid616TrackState,
     onEditNote: () -> Unit,
     onEditLength: () -> Unit,
-    onToggleMute: () -> Unit,
-    onCyclePlaybackMode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -394,10 +498,41 @@ private fun TrackHeader(
             text = "L${track.length}",
             onClick = onEditLength,
         )
-        CompactClickableField(
-            text = track.playbackMode.shortLabel(),
-            onClick = onCyclePlaybackMode,
-        )
+    }
+}
+
+@Composable
+private fun TrackBottomControls(
+    track: Grid616TrackState,
+    modeMenuExpanded: Boolean,
+    onOpenModeMenu: () -> Unit,
+    onDismissModeMenu: () -> Unit,
+    onSelectPlaybackMode: (Grid616PlaybackMode) -> Unit,
+    onToggleMute: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Box {
+            CompactClickableField(
+                text = track.playbackMode.shortLabel(),
+                onClick = onOpenModeMenu,
+            )
+            DropdownMenu(
+                expanded = modeMenuExpanded,
+                onDismissRequest = onDismissModeMenu
+            ) {
+                Grid616PlaybackMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(mode.shortLabel()) },
+                        onClick = { onSelectPlaybackMode(mode) }
+                    )
+                }
+            }
+        }
         CompactClickableField(
             text = "M",
             onClick = onToggleMute,
@@ -425,7 +560,7 @@ private fun CompactClickableField(
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(Grid616TrackControlWidth)
             .clip(ProtoControlShape)
             .background(background)
             .border(width = 1.dp, color = border, shape = ProtoControlShape)
@@ -510,13 +645,6 @@ private fun Grid616TrackState.updateStep(
 private fun Grid616PlaybackMode.shortLabel(): String = when (this) {
     Grid616PlaybackMode.FORWARD -> "FWD"
     Grid616PlaybackMode.REVERSE -> "REV"
-    Grid616PlaybackMode.PING_PONG -> "PING"
+    Grid616PlaybackMode.PING_PONG -> "PNG"
     Grid616PlaybackMode.RANDOM -> "RND"
-}
-
-private fun Grid616PlaybackMode.next(): Grid616PlaybackMode = when (this) {
-    Grid616PlaybackMode.FORWARD -> Grid616PlaybackMode.REVERSE
-    Grid616PlaybackMode.REVERSE -> Grid616PlaybackMode.PING_PONG
-    Grid616PlaybackMode.PING_PONG -> Grid616PlaybackMode.RANDOM
-    Grid616PlaybackMode.RANDOM -> Grid616PlaybackMode.FORWARD
 }
