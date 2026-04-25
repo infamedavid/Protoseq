@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -46,13 +48,13 @@ import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
 import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
-import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
 private val Grid616StepCellSize = 20.dp
 private val Grid616GridSpacing = 4.dp
 private val Grid616StepNumberWidth = 34.dp
 private val Grid616TrackControlWidth = 40.dp
+private val Grid616TrackColumnWidth = 36.dp
 
 @Composable
 fun Grid616Panel(
@@ -75,16 +77,15 @@ fun Grid616Panel(
 
     Column(
         modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.Top
         ) {
-            ProtoValueField(
-                label = "CHNL",
-                value = state.midiChannel.toString(),
+            CompactChannelControl(
+                channel = state.midiChannel,
                 onDecrement = {
                     val next = if (state.midiChannel <= 1) 16 else state.midiChannel - 1
                     applyState(state.copy(midiChannel = next))
@@ -93,33 +94,39 @@ fun Grid616Panel(
                     val next = if (state.midiChannel >= 16) 1 else state.midiChannel + 1
                     applyState(state.copy(midiChannel = next))
                 },
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.width(124.dp)
             )
 
             Column(
-                modifier = Modifier.weight(1.2f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                Text(
-                    text = "SWING",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "SWING",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${(state.swingAmount * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Slider(
                     value = state.swingAmount,
                     onValueChange = { value ->
                         applyState(state.copy(swingAmount = value.coerceIn(0f, 0.75f)))
                     },
                     valueRange = 0f..0.75f,
-                    steps = 2
-                )
-                Text(
-                    text = "${(state.swingAmount * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    steps = 2,
+                    modifier = Modifier.height(28.dp)
                 )
             }
-
         }
 
         Row(
@@ -128,6 +135,7 @@ fun Grid616Panel(
             horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
         ) {
             Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
+            Spacer(modifier = Modifier.weight(1f))
             state.tracks.forEachIndexed { trackIndex, track ->
                 TrackTopControls(
                     trackIndex = trackIndex,
@@ -140,7 +148,7 @@ fun Grid616Panel(
                         editingTrackLengthIndex = trackIndex
                         lengthDraft = track.length
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.width(Grid616TrackColumnWidth)
                 )
             }
         }
@@ -160,6 +168,7 @@ fun Grid616Panel(
                         textAlign = TextAlign.End
                     )
 
+                    Spacer(modifier = Modifier.weight(1f))
                     state.tracks.forEachIndexed { trackIndex, track ->
                         val step = track.steps[stepIndex]
                         val editable = stepIndex < track.length
@@ -182,7 +191,7 @@ fun Grid616Panel(
                                 velocityDraft = step.velocity.toFloat()
                                 delayDraft = step.delayTicks.toFloat()
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.width(Grid616TrackColumnWidth)
                         )
                     }
                 }
@@ -195,6 +204,7 @@ fun Grid616Panel(
             horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
         ) {
             Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
+            Spacer(modifier = Modifier.weight(1f))
             state.tracks.forEachIndexed { trackIndex, track ->
                 TrackBottomControls(
                     track = track,
@@ -216,7 +226,7 @@ fun Grid616Panel(
                     onToggleMute = {
                         applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.width(Grid616TrackColumnWidth)
                 )
             }
         }
@@ -401,6 +411,69 @@ fun Grid616Panel(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun CompactChannelControl(
+    channel: Int,
+    onDecrement: () -> Unit,
+    onIncrement: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = "CHNL",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(
+                onClick = onDecrement,
+                shape = ProtoControlShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(34.dp)
+            ) {
+                Text("-")
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(34.dp)
+                    .clip(ProtoControlShape)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                        shape = ProtoControlShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = channel.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+            }
+
+            OutlinedButton(
+                onClick = onIncrement,
+                shape = ProtoControlShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(34.dp)
+            ) {
+                Text("+")
+            }
+        }
     }
 }
 
