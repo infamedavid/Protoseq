@@ -4,6 +4,7 @@ import android.content.Context
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.PROTOSEQ_SESSION_STATE_VERSION
@@ -298,7 +299,6 @@ private fun stochasticSequencerUiStateFromJsonObject(
 private fun Grid616SequencerUiState.toJsonObject(): JSONObject = JSONObject()
     .put("midiChannel", midiChannel)
     .put("swingAmount", swingAmount)
-    .put("playbackMode", playbackMode.name)
     .put(
         "tracks",
         JSONArray().apply {
@@ -312,6 +312,7 @@ private fun Grid616TrackState.toJsonObject(): JSONObject = JSONObject()
     .put("note", note)
     .put("muted", muted)
     .put("length", length)
+    .put("playbackMode", playbackMode.name)
     .put(
         "steps",
         JSONArray().apply {
@@ -332,12 +333,22 @@ private fun grid616SequencerUiStateFromJsonObject(
 ): Grid616SequencerUiState {
     if (json == null) return defaultState
 
+    val legacyGlobalPlaybackMode = enumValueOrDefault(
+        rawName = json.optString("playbackMode", Grid616PlaybackMode.FORWARD.name),
+        default = Grid616PlaybackMode.FORWARD,
+    )
     val defaultTrack = Grid616TrackState(note = 24)
     val tracks = (json.optJSONArray("tracks") ?: JSONArray()).let { tracksJson ->
         buildList {
             for (i in 0 until tracksJson.length()) {
                 val trackJson = tracksJson.optJSONObject(i) ?: continue
-                add(grid616TrackStateFromJsonObject(trackJson, defaultTrack))
+                add(
+                    grid616TrackStateFromJsonObject(
+                        json = trackJson,
+                        defaultState = defaultTrack,
+                        playbackModeFallback = legacyGlobalPlaybackMode,
+                    )
+                )
             }
         }
     }
@@ -345,10 +356,6 @@ private fun grid616SequencerUiStateFromJsonObject(
     return defaultState.copy(
         midiChannel = json.optInt("midiChannel", defaultState.midiChannel),
         swingAmount = json.optDouble("swingAmount", defaultState.swingAmount.toDouble()).toFloat(),
-        playbackMode = enumValueOrDefault(
-            rawName = json.optString("playbackMode", defaultState.playbackMode.name),
-            default = defaultState.playbackMode,
-        ),
         tracks = tracks,
     ).normalized()
 }
@@ -356,6 +363,7 @@ private fun grid616SequencerUiStateFromJsonObject(
 private fun grid616TrackStateFromJsonObject(
     json: JSONObject,
     defaultState: Grid616TrackState,
+    playbackModeFallback: Grid616PlaybackMode,
 ): Grid616TrackState {
     val steps = (json.optJSONArray("steps") ?: JSONArray()).let { stepsJson ->
         buildList {
@@ -370,6 +378,10 @@ private fun grid616TrackStateFromJsonObject(
         note = json.optInt("note", defaultState.note),
         muted = json.optBoolean("muted", defaultState.muted),
         length = json.optInt("length", defaultState.length),
+        playbackMode = enumValueOrDefault(
+            rawName = json.optString("playbackMode", playbackModeFallback.name),
+            default = playbackModeFallback,
+        ),
         steps = steps,
     )
 }

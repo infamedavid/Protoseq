@@ -44,6 +44,16 @@ class Grid616SequencerUiStateTest {
     }
 
     @Test
+    fun trackNormalizationPreservesPlaybackMode() {
+        val normalized = Grid616TrackState(
+            note = 36,
+            playbackMode = Grid616PlaybackMode.RANDOM,
+        ).normalized()
+
+        assertEquals(Grid616PlaybackMode.RANDOM, normalized.playbackMode)
+    }
+
+    @Test
     fun sequencerNormalizationClampsChannelAndSwingAndPadsTracks() {
         val normalized = Grid616SequencerUiState(
             midiChannel = 20,
@@ -73,6 +83,8 @@ class Grid616SequencerUiStateTest {
         val notes = defaultGrid616Tracks().map { it.note }
 
         assertEquals(listOf(24, 26, 30, 34, 36, 38), notes)
+        assertEquals(GRID_616_TRACK_COUNT, notes.size)
+        assertTrue(defaultGrid616Tracks().all { it.playbackMode == Grid616PlaybackMode.FORWARD })
         assertTrue(defaultGrid616Tracks().all { it.steps.size == GRID_616_MAX_STEPS })
     }
 }

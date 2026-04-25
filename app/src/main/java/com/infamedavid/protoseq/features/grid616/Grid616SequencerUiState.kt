@@ -32,6 +32,7 @@ data class Grid616TrackState(
     val note: Int,
     val muted: Boolean = false,
     val length: Int = GRID_616_MAX_STEPS,
+    val playbackMode: Grid616PlaybackMode = Grid616PlaybackMode.FORWARD,
     val steps: List<Grid616StepState> = defaultGrid616Steps(),
 )
 
@@ -56,7 +57,6 @@ fun defaultGrid616Tracks(): List<Grid616TrackState> =
 data class Grid616SequencerUiState(
     val midiChannel: Int = 10,
     val swingAmount: Float = 0f,
-    val playbackMode: Grid616PlaybackMode = Grid616PlaybackMode.FORWARD,
     val tracks: List<Grid616TrackState> = defaultGrid616Tracks(),
 )
 
