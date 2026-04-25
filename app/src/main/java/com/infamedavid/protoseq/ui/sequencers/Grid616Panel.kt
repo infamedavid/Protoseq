@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -47,7 +48,9 @@ import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.applyCrptSnapshotWithMutation
 import com.infamedavid.protoseq.features.grid616.normalized
+import com.infamedavid.protoseq.features.grid616.toCrptSnapshot
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
@@ -239,6 +242,45 @@ fun Grid616Panel(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            CrptControls(
+                hasSnapshot = state.crptState.snapshot != null,
+                rndmAmount = state.crptState.rndmAmount,
+                onSave = {
+                    applyState(
+                        state.copy(
+                            crptState = state.crptState.copy(
+                                snapshot = state.toCrptSnapshot()
+                            )
+                        ).normalized()
+                    )
+                },
+                onSet = {
+                    val snapshot = state.crptState.snapshot
+                    applyState(
+                        if (snapshot != null) {
+                            state.applyCrptSnapshotWithMutation(
+                                snapshot = snapshot,
+                                rndmAmount = state.crptState.rndmAmount
+                            ).normalized()
+                        } else {
+                            state
+                        }
+                    )
+                },
+                onRndmChange = { value ->
+                    applyState(
+                        state.copy(
+                            crptState = state.crptState.copy(
+                                rndmAmount = value.coerceIn(0f, 1f)
+                            )
+                        )
+                    )
+                },
+                modifier = Modifier.widthIn(max = 120.dp)
+            )
         }
     }
 
@@ -420,6 +462,69 @@ fun Grid616Panel(
                     Text("Cancel")
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun CrptControls(
+    hasSnapshot: Boolean,
+    rndmAmount: Float,
+    onSave: () -> Unit,
+    onSet: () -> Unit,
+    onRndmChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            OutlinedButton(
+                onClick = onSave,
+                shape = ProtoControlShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(30.dp)
+            ) {
+                Text("SAVE", style = MaterialTheme.typography.labelSmall)
+            }
+            OutlinedButton(
+                onClick = onSet,
+                enabled = hasSnapshot,
+                shape = ProtoControlShape,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                modifier = Modifier.height(30.dp)
+            ) {
+                Text("SET", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "RNDM",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = "${(rndmAmount.coerceIn(0f, 1f) * 100).toInt()}%",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Slider(
+            value = rndmAmount.coerceIn(0f, 1f),
+            onValueChange = onRndmChange,
+            valueRange = 0f..1f,
+            modifier = Modifier.height(28.dp)
         )
     }
 }
