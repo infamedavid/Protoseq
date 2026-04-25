@@ -475,4 +475,45 @@ class ProtoseqSessionStoreTest {
         assertEquals(GRID_616_MAX_DELAY_TICKS, track.steps[1].delayTicks)
         assertTrue(track.length in GRID_616_MIN_TRACK_LENGTH..GRID_616_MAX_TRACK_LENGTH)
     }
+
+    @Test
+    fun grid616StateParsingClampsLegacyDelayValueToCurrentMax() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "tracks",
+                                    JSONArray().put(
+                                        JSONObject()
+                                            .put("note", 36)
+                                            .put(
+                                                "steps",
+                                                JSONArray().put(
+                                                    JSONObject()
+                                                        .put("enabled", true)
+                                                        .put("velocity", 100)
+                                                        .put("delayTicks", 23)
+                                                )
+                                            )
+                                    )
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        val step = decoded.pages[0].grid616State.tracks.first().steps.first()
+
+        assertEquals(GRID_616_MAX_DELAY_TICKS, step.delayTicks)
+        assertEquals(16, step.delayTicks)
+    }
 }

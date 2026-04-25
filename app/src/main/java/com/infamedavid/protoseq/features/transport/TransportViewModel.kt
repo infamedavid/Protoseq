@@ -19,7 +19,7 @@ import com.infamedavid.protoseq.core.repeater.RptrDivision
 import com.infamedavid.protoseq.core.repeater.RptrMidiOut
 import com.infamedavid.protoseq.core.repeater.RptrState
 import com.infamedavid.protoseq.features.grid616.GRID_616_GATE_TICKS
-import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_DELAY_TICKS
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_FINAL_DELAY_TICKS
 import com.infamedavid.protoseq.features.grid616.GRID_616_TICKS_PER_STEP
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerConfig
 import com.infamedavid.protoseq.features.grid616.resolveGrid616StepIndex
@@ -346,7 +346,8 @@ class TransportViewModel(
                 } else {
                     0
                 }
-                val finalDelayTicks = (swingDelayTicks + step.delayTicks).coerceIn(0, GRID_616_MAX_DELAY_TICKS)
+                val finalDelayTicks = (swingDelayTicks + step.delayTicks)
+                    .coerceIn(0, GRID_616_MAX_FINAL_DELAY_TICKS)
                 val dueTick = currentTick + finalDelayTicks
                 val trigger = Grid616ScheduledTrigger(
                     dueTick = dueTick,
