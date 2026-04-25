@@ -1,5 +1,9 @@
 package com.infamedavid.protoseq.features.sequencer
 
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_STEPS
+import com.infamedavid.protoseq.features.grid616.GRID_616_TRACK_COUNT
+import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
+import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -35,6 +39,25 @@ class ProtoseqSessionStateTest {
 
         assertTrue(session.pages.all { it.selectedSequencerType == SequencerType.EMPTY })
         assertTrue(session.pages.all { !it.enabled })
+    }
+
+    @Test
+    fun defaultPagesHaveDefaultGrid616State() {
+        val session = createDefaultProtoseqSessionState()
+
+        assertTrue(session.pages.all { it.grid616State == Grid616SequencerUiState() })
+    }
+
+    @Test
+    fun defaultGrid616StateUsesExpectedDefaults() {
+        val state = Grid616SequencerUiState()
+
+        assertEquals(10, state.midiChannel)
+        assertEquals(0f, state.swingAmount)
+        assertEquals(Grid616PlaybackMode.FORWARD, state.playbackMode)
+        assertEquals(GRID_616_TRACK_COUNT, state.tracks.size)
+        assertTrue(state.tracks.all { it.length == GRID_616_MAX_STEPS })
+        assertTrue(state.tracks.all { it.steps.size == GRID_616_MAX_STEPS })
     }
 
     @Test
@@ -91,32 +114,53 @@ class ProtoseqSessionStateTest {
     }
 
     @Test
-    fun changingToTuringMachinePreservesExistingTuringState() {
+    fun changingToTuringMachinePreservesExistingTuringAndGrid616State() {
         val customTuringState = StochasticSequencerUiState(sequenceLength = 24, baseNote = 60)
+        val customGridState = Grid616SequencerUiState(midiChannel = 8)
         val page = SequencerPageState(
             pageIndex = 0,
             selectedSequencerType = SequencerType.EMPTY,
             turingState = customTuringState,
+            grid616State = customGridState,
         )
 
         val updated = page.withSequencerType(SequencerType.TURING_MACHINE)
 
         assertEquals(SequencerType.TURING_MACHINE, updated.selectedSequencerType)
         assertEquals(customTuringState, updated.turingState)
+        assertEquals(customGridState, updated.grid616State)
     }
 
     @Test
-    fun changingBackToEmptyDoesNotEraseTuringState() {
+    fun changingToGrid616PreservesExistingTuringAndGrid616State() {
         val customTuringState = StochasticSequencerUiState(sequenceLength = 12, baseNote = 72)
+        val customGridState = Grid616SequencerUiState(midiChannel = 11)
         val page = SequencerPageState(
             pageIndex = 1,
-            selectedSequencerType = SequencerType.TURING_MACHINE,
+            selectedSequencerType = SequencerType.EMPTY,
             turingState = customTuringState,
+            grid616State = customGridState,
+        )
+
+        val updated = page.withSequencerType(SequencerType.GRID_616)
+
+        assertEquals(SequencerType.GRID_616, updated.selectedSequencerType)
+        assertEquals(customTuringState, updated.turingState)
+        assertEquals(customGridState, updated.grid616State)
+    }
+
+    @Test
+    fun changingBackToEmptyDoesNotEraseGrid616State() {
+        val customGridState = Grid616SequencerUiState(midiChannel = 12)
+        val page = SequencerPageState(
+            pageIndex = 1,
+            selectedSequencerType = SequencerType.GRID_616,
+            grid616State = customGridState,
         )
 
         val updated = page.withSequencerType(SequencerType.EMPTY)
 
         assertEquals(SequencerType.EMPTY, updated.selectedSequencerType)
-        assertEquals(customTuringState, updated.turingState)
+        assertEquals(customGridState, updated.grid616State)
     }
 }
