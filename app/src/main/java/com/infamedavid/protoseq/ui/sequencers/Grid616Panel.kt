@@ -1,0 +1,492 @@
+package com.infamedavid.protoseq.ui.sequencers
+
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Slider
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_DELAY_TICKS
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_STEPS
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_TRACK_LENGTH
+import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_VELOCITY
+import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_TRACK_LENGTH
+import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_VELOCITY
+import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
+import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
+import com.infamedavid.protoseq.features.grid616.Grid616StepState
+import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.normalized
+import com.infamedavid.protoseq.ui.components.ProtoControlShape
+import com.infamedavid.protoseq.ui.components.ProtoValueField
+import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
+
+private val Grid616StepCellSize = 12.dp
+private val Grid616StepGridGap = 2.dp
+private val Grid616StepNumberWidth = 22.dp
+
+@Composable
+fun Grid616Panel(
+    state: Grid616SequencerUiState,
+    onStateChange: (Grid616SequencerUiState) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val modes = remember {
+        listOf(
+            Grid616PlaybackMode.FORWARD,
+            Grid616PlaybackMode.REVERSE,
+            Grid616PlaybackMode.PING_PONG,
+            Grid616PlaybackMode.RANDOM,
+        )
+    }
+    val modeLabels = remember {
+        mapOf(
+            Grid616PlaybackMode.FORWARD to "FWD",
+            Grid616PlaybackMode.REVERSE to "REV",
+            Grid616PlaybackMode.PING_PONG to "PING",
+            Grid616PlaybackMode.RANDOM to "RND",
+        )
+    }
+
+    var editingCell by remember { mutableStateOf<Grid616CellRef?>(null) }
+    var velocityDraft by remember { mutableFloatStateOf(GRID_616_MIN_VELOCITY.toFloat()) }
+    var delayDraft by remember { mutableFloatStateOf(0f) }
+    var editingTrackNoteIndex by remember { mutableStateOf<Int?>(null) }
+    var noteDraft by remember { mutableStateOf(60) }
+    var editingTrackLengthIndex by remember { mutableStateOf<Int?>(null) }
+    var lengthDraft by remember { mutableStateOf(GRID_616_MAX_STEPS) }
+
+    fun applyState(nextState: Grid616SequencerUiState) {
+        onStateChange(nextState.normalized())
+    }
+
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            ProtoValueField(
+                label = "CHNL",
+                value = state.midiChannel.toString(),
+                onDecrement = {
+                    val next = if (state.midiChannel <= 1) 16 else state.midiChannel - 1
+                    applyState(state.copy(midiChannel = next))
+                },
+                onIncrement = {
+                    val next = if (state.midiChannel >= 16) 1 else state.midiChannel + 1
+                    applyState(state.copy(midiChannel = next))
+                },
+                modifier = Modifier.weight(1f)
+            )
+
+            Column(
+                modifier = Modifier.weight(1.2f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "SWING",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Slider(
+                    value = state.swingAmount,
+                    onValueChange = { value ->
+                        applyState(state.copy(swingAmount = value.coerceIn(0f, 0.75f)))
+                    },
+                    valueRange = 0f..0.75f,
+                    steps = 2
+                )
+                Text(
+                    text = "${(state.swingAmount * 100).toInt()}%",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            ProtoValueField(
+                label = "MODE",
+                value = modeLabels.getValue(state.playbackMode),
+                onClick = {
+                    val currentIndex = modes.indexOf(state.playbackMode).coerceAtLeast(0)
+                    val nextMode = modes[(currentIndex + 1) % modes.size]
+                    applyState(state.copy(playbackMode = nextMode))
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Spacer(modifier = Modifier.width(34.dp))
+            state.tracks.forEachIndexed { trackIndex, track ->
+                TrackHeader(
+                    trackIndex = trackIndex,
+                    track = track,
+                    onEditNote = {
+                        editingTrackNoteIndex = trackIndex
+                        noteDraft = track.note
+                    },
+                    onEditLength = {
+                        editingTrackLengthIndex = trackIndex
+                        lengthDraft = track.length
+                    },
+                    onToggleMute = {
+                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+            repeat(GRID_616_MAX_STEPS) { stepIndex ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Grid616StepGridGap)
+                ) {
+                    Text(
+                        text = "%02d".format(stepIndex + 1),
+                        modifier = Modifier.width(Grid616StepNumberWidth),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.End
+                    )
+
+                    state.tracks.forEachIndexed { trackIndex, track ->
+                        val step = track.steps[stepIndex]
+                        val editable = stepIndex < track.length
+                        StepCell(
+                            enabled = step.enabled,
+                            editable = editable,
+                            onClick = {
+                                if (!editable) return@StepCell
+                                applyState(
+                                    state.updateTrack(trackIndex) { trackState ->
+                                        trackState.updateStep(stepIndex) { cell ->
+                                            cell.copy(enabled = !cell.enabled)
+                                        }
+                                    }
+                                )
+                            },
+                            onLongPress = {
+                                if (!editable) return@StepCell
+                                editingCell = Grid616CellRef(trackIndex = trackIndex, stepIndex = stepIndex)
+                                velocityDraft = step.velocity.toFloat()
+                                delayDraft = step.delayTicks.toFloat()
+                            },
+                            modifier = Modifier.size(Grid616StepCellSize)
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    val openEditor = editingCell
+    if (openEditor != null) {
+        AlertDialog(
+            onDismissRequest = { editingCell = null },
+            title = {
+                Text(text = "T${openEditor.trackIndex + 1} Step ${"%02d".format(openEditor.stepIndex + 1)}")
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "Velocity: ${velocityDraft.toInt()}")
+                    Slider(
+                        value = velocityDraft,
+                        onValueChange = { velocityDraft = it.coerceIn(GRID_616_MIN_VELOCITY.toFloat(), GRID_616_MAX_VELOCITY.toFloat()) },
+                        valueRange = GRID_616_MIN_VELOCITY.toFloat()..GRID_616_MAX_VELOCITY.toFloat(),
+                        steps = GRID_616_MAX_VELOCITY - GRID_616_MIN_VELOCITY - 1
+                    )
+
+                    Text(text = "Delay: ${delayDraft.toInt()} ticks")
+                    Slider(
+                        value = delayDraft,
+                        onValueChange = { delayDraft = it.coerceIn(0f, GRID_616_MAX_DELAY_TICKS.toFloat()) },
+                        valueRange = 0f..GRID_616_MAX_DELAY_TICKS.toFloat(),
+                        steps = GRID_616_MAX_DELAY_TICKS - 1
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        applyState(
+                            state.updateTrack(openEditor.trackIndex) { track ->
+                                track.updateStep(openEditor.stepIndex) { step ->
+                                    step.copy(
+                                        velocity = velocityDraft.toInt().coerceIn(GRID_616_MIN_VELOCITY, GRID_616_MAX_VELOCITY),
+                                        delayTicks = delayDraft.toInt().coerceIn(0, GRID_616_MAX_DELAY_TICKS),
+                                    )
+                                }
+                            }
+                        )
+                        editingCell = null
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingCell = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    val openNoteEditorTrack = editingTrackNoteIndex
+    if (openNoteEditorTrack != null) {
+        AlertDialog(
+            onDismissRequest = { editingTrackNoteIndex = null },
+            title = { Text("Track ${openNoteEditorTrack + 1} Note") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = midiNoteToDisplay(noteDraft),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { noteDraft = (noteDraft - 1).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("-")
+                        }
+                        OutlinedButton(
+                            onClick = { noteDraft = (noteDraft + 1).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("+")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        applyState(
+                            state.updateTrack(openNoteEditorTrack) {
+                                it.copy(note = noteDraft.coerceIn(0, 127))
+                            }
+                        )
+                        editingTrackNoteIndex = null
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingTrackNoteIndex = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    val openLengthEditorTrack = editingTrackLengthIndex
+    if (openLengthEditorTrack != null) {
+        AlertDialog(
+            onDismissRequest = { editingTrackLengthIndex = null },
+            title = { Text("Track ${openLengthEditorTrack + 1} Length") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "L$lengthDraft",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Slider(
+                        value = lengthDraft.toFloat(),
+                        onValueChange = {
+                            lengthDraft = it.toInt().coerceIn(
+                                GRID_616_MIN_TRACK_LENGTH,
+                                GRID_616_MAX_TRACK_LENGTH
+                            )
+                        },
+                        valueRange = GRID_616_MIN_TRACK_LENGTH.toFloat()..GRID_616_MAX_TRACK_LENGTH.toFloat(),
+                        steps = GRID_616_MAX_TRACK_LENGTH - GRID_616_MIN_TRACK_LENGTH - 1
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        applyState(
+                            state.updateTrack(openLengthEditorTrack) {
+                                it.copy(
+                                    length = lengthDraft.coerceIn(
+                                        GRID_616_MIN_TRACK_LENGTH,
+                                        GRID_616_MAX_TRACK_LENGTH
+                                    )
+                                )
+                            }
+                        )
+                        editingTrackLengthIndex = null
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingTrackLengthIndex = null }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TrackHeader(
+    trackIndex: Int,
+    track: Grid616TrackState,
+    onEditNote: () -> Unit,
+    onEditLength: () -> Unit,
+    onToggleMute: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(
+            text = "T${trackIndex + 1}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        CompactClickableField(
+            text = midiNoteToDisplay(track.note),
+            onClick = onEditNote,
+        )
+        CompactClickableField(
+            text = "L${track.length}",
+            onClick = onEditLength,
+        )
+        CompactClickableField(
+            text = "M",
+            onClick = onToggleMute,
+            active = track.muted
+        )
+    }
+}
+
+@Composable
+private fun CompactClickableField(
+    text: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
+) {
+    val background = if (active) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+    val border = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(ProtoControlShape)
+            .background(background)
+            .border(width = 1.dp, color = border, shape = ProtoControlShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun StepCell(
+    enabled: Boolean,
+    editable: Boolean,
+    onClick: () -> Unit,
+    onLongPress: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val background = when {
+        !editable -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f)
+        enabled -> MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    }
+
+    val borderColor = when {
+        !editable -> MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
+        enabled -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+    }
+
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(ProtoControlShape)
+            .border(width = 1.dp, color = borderColor, shape = ProtoControlShape)
+            .background(background)
+            .combinedClickable(
+                enabled = editable,
+                onClick = onClick,
+                onLongClick = onLongPress,
+            )
+    )
+}
+
+private data class Grid616CellRef(
+    val trackIndex: Int,
+    val stepIndex: Int,
+)
+
+private fun Grid616SequencerUiState.updateTrack(
+    trackIndex: Int,
+    transform: (Grid616TrackState) -> Grid616TrackState,
+): Grid616SequencerUiState {
+    val nextTracks = tracks.mapIndexed { index, trackState ->
+        if (index == trackIndex) transform(trackState) else trackState
+    }
+    return copy(tracks = nextTracks)
+}
+
+private fun Grid616TrackState.updateStep(
+    stepIndex: Int,
+    transform: (Grid616StepState) -> Grid616StepState,
+): Grid616TrackState {
+    val nextSteps = steps.mapIndexed { index, stepState ->
+        if (index == stepIndex) transform(stepState) else stepState
+    }
+    return copy(steps = nextSteps)
+}
