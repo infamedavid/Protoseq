@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -47,9 +47,9 @@ import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
-private val Grid616StepCellSize = 12.dp
-private val Grid616StepGridGap = 2.dp
-private val Grid616StepNumberWidth = 22.dp
+private val Grid616StepCellSize = 20.dp
+private val Grid616GridSpacing = 4.dp
+private val Grid616StepNumberWidth = 34.dp
 
 @Composable
 fun Grid616Panel(
@@ -148,9 +148,9 @@ fun Grid616Panel(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
         ) {
-            Spacer(modifier = Modifier.width(34.dp))
+            Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
             state.tracks.forEachIndexed { trackIndex, track ->
                 TrackHeader(
                     trackIndex = trackIndex,
@@ -171,12 +171,12 @@ fun Grid616Panel(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Grid616GridSpacing)) {
             repeat(GRID_616_MAX_STEPS) { stepIndex ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Grid616StepGridGap)
+                    horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
                 ) {
                     Text(
                         text = "%02d".format(stepIndex + 1),
@@ -208,7 +208,7 @@ fun Grid616Panel(
                                 velocityDraft = step.velocity.toFloat()
                                 delayDraft = step.delayTicks.toFloat()
                             },
-                            modifier = Modifier.size(Grid616StepCellSize)
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -228,7 +228,12 @@ fun Grid616Panel(
                     Text(text = "Velocity: ${velocityDraft.toInt()}")
                     Slider(
                         value = velocityDraft,
-                        onValueChange = { velocityDraft = it.coerceIn(GRID_616_MIN_VELOCITY.toFloat(), GRID_616_MAX_VELOCITY.toFloat()) },
+                        onValueChange = {
+                            velocityDraft = it.coerceIn(
+                                GRID_616_MIN_VELOCITY.toFloat(),
+                                GRID_616_MAX_VELOCITY.toFloat()
+                            )
+                        },
                         valueRange = GRID_616_MIN_VELOCITY.toFloat()..GRID_616_MAX_VELOCITY.toFloat(),
                         steps = GRID_616_MAX_VELOCITY - GRID_616_MIN_VELOCITY - 1
                     )
@@ -236,7 +241,9 @@ fun Grid616Panel(
                     Text(text = "Delay: ${delayDraft.toInt()} ticks")
                     Slider(
                         value = delayDraft,
-                        onValueChange = { delayDraft = it.coerceIn(0f, GRID_616_MAX_DELAY_TICKS.toFloat()) },
+                        onValueChange = {
+                            delayDraft = it.coerceIn(0f, GRID_616_MAX_DELAY_TICKS.toFloat())
+                        },
                         valueRange = 0f..GRID_616_MAX_DELAY_TICKS.toFloat(),
                         steps = GRID_616_MAX_DELAY_TICKS - 1
                     )
@@ -249,8 +256,14 @@ fun Grid616Panel(
                             state.updateTrack(openEditor.trackIndex) { track ->
                                 track.updateStep(openEditor.stepIndex) { step ->
                                     step.copy(
-                                        velocity = velocityDraft.toInt().coerceIn(GRID_616_MIN_VELOCITY, GRID_616_MAX_VELOCITY),
-                                        delayTicks = delayDraft.toInt().coerceIn(0, GRID_616_MAX_DELAY_TICKS),
+                                        velocity = velocityDraft.toInt().coerceIn(
+                                            GRID_616_MIN_VELOCITY,
+                                            GRID_616_MAX_VELOCITY
+                                        ),
+                                        delayTicks = delayDraft.toInt().coerceIn(
+                                            0,
+                                            GRID_616_MAX_DELAY_TICKS
+                                        ),
                                     )
                                 }
                             }
@@ -309,10 +322,14 @@ fun Grid616Panel(
                         )
                         editingTrackNoteIndex = null
                     }
-                ) { Text("OK") }
+                ) {
+                    Text("OK")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { editingTrackNoteIndex = null }) { Text("Cancel") }
+                TextButton(onClick = { editingTrackNoteIndex = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -356,10 +373,14 @@ fun Grid616Panel(
                         )
                         editingTrackLengthIndex = null
                     }
-                ) { Text("OK") }
+                ) {
+                    Text("OK")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { editingTrackLengthIndex = null }) { Text("Cancel") }
+                TextButton(onClick = { editingTrackLengthIndex = null }) {
+                    Text("Cancel")
+                }
             }
         )
     }
@@ -411,7 +432,12 @@ private fun CompactClickableField(
     } else {
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
     }
-    val border = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    val border = if (active) {
+        MaterialTheme.colorScheme.primary
+    } else {
+        MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -453,17 +479,22 @@ private fun StepCell(
     }
 
     Box(
-        modifier = modifier
-            .aspectRatio(1f)
-            .clip(ProtoControlShape)
-            .border(width = 1.dp, color = borderColor, shape = ProtoControlShape)
-            .background(background)
-            .combinedClickable(
-                enabled = editable,
-                onClick = onClick,
-                onLongClick = onLongPress,
-            )
-    )
+        modifier = modifier.height(Grid616StepCellSize),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(Grid616StepCellSize)
+                .clip(ProtoControlShape)
+                .border(width = 1.dp, color = borderColor, shape = ProtoControlShape)
+                .background(background)
+                .combinedClickable(
+                    enabled = editable,
+                    onClick = onClick,
+                    onLongClick = onLongPress,
+                )
+        )
+    }
 }
 
 private data class Grid616CellRef(
