@@ -45,6 +45,7 @@ class TransportViewModel(
     private val runtimeMutex = Mutex()
     private val activeTuringPageConfigs = mutableMapOf<Int, StochasticSequencerConfig>()
     private val pageRuntimes = mutableMapOf<Int, PageRuntime>()
+    private val activeMidiNotes = ActiveMidiNoteRegistry()
     private var latestClockTick: Long = 1L
 
     private val _uiState = MutableStateFlow(
@@ -75,11 +76,11 @@ class TransportViewModel(
                     latestClockTick = tick
                     pageRuntimes.forEach { (pageIndex, runtime) ->
                         val repeaterTickResult = runtime.repeaterEngine.onTick(tick)
-                        sendRepeaterMidi(repeaterTickResult.midi)
-                        processDueNoteOffs(runtime, tick)
+                        sendRepeaterMidi(pageIndex, repeaterTickResult.midi)
+                        processDueNoteOffs(pageIndex, runtime, tick)
                         val config = activeTuringPageConfigs[pageIndex]
                         if (config != null && isSequencerStepTick(tick)) {
-                            advanceSequencer(runtime, config, tick)
+                            advanceSequencer(pageIndex, runtime, config, tick)
                         }
                         processCcSlewTick(runtime, config)
                     }
@@ -152,10 +153,11 @@ class TransportViewModel(
                     TransportState.Paused -> {
                         pageRuntimes.values.forEach { runtime ->
                             val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
-                            sendRepeaterMidi(stopResult.midi)
+                            sendRepeaterMidi(runtime.pageIndex, stopResult.midi)
                             sendAndClearPendingNoteOffs(runtime)
                             clearCcSlewState(runtime)
                         }
+                        releaseAllNotesLocked()
                         syncRptrUiState()
                         clockEngine.stop()
                         midiEngine.sendStop()
@@ -173,7 +175,7 @@ class TransportViewModel(
                 if (clockEngine.getTransportState() == TransportState.Playing) {
                     pageRuntimes.values.forEach { runtime ->
                         val pauseResult = runtime.repeaterEngine.onTransportPause(currentTick = 0L)
-                        sendRepeaterMidi(pauseResult.midi)
+                        sendRepeaterMidi(runtime.pageIndex, pauseResult.midi)
                         sendAndClearPendingNoteOffs(runtime)
                     }
                     syncRptrUiState()
@@ -240,7 +242,7 @@ class TransportViewModel(
             runtimeMutex.withLock {
                 val runtime = pageRuntimes[pageIndex] ?: return@withLock
                 val releaseResult = runtime.repeaterEngine.release(currentTick = latestClockTick)
-                sendRepeaterMidi(releaseResult.midi)
+                sendRepeaterMidi(pageIndex, releaseResult.midi)
                 syncRptrUiState()
             }
         }
@@ -257,7 +259,7 @@ class TransportViewModel(
 
     private fun isSequencerStepTick(tick: Long): Boolean = ((tick - 1L) % TICKS_PER_STEP) == 0L
 
-    private fun processDueNoteOffs(runtime: PageRuntime, currentTick: Long) {
+    private fun processDueNoteOffs(pageIndex: Int, runtime: PageRuntime, currentTick: Long) {
         val iterator = runtime.scheduledNoteOffs.iterator()
         while (iterator.hasNext()) {
             val scheduled = iterator.next()
@@ -269,12 +271,9 @@ class TransportViewModel(
                         note = scheduled.note
                     )
                 )
-                sendRepeaterMidi(routeResult.extraMidi)
+                sendRepeaterMidi(pageIndex, routeResult.extraMidi)
                 if (routeResult.passThrough) {
-                    midiEngine.sendNoteOff(
-                        channel = scheduled.channel,
-                        note = scheduled.note
-                    )
+                    releasePageNoteLocked(pageIndex, scheduled.channel, scheduled.note)
                 }
                 iterator.remove()
             }
@@ -282,6 +281,7 @@ class TransportViewModel(
     }
 
     private fun advanceSequencer(
+        pageIndex: Int,
         runtime: PageRuntime,
         config: StochasticSequencerConfig,
         currentTick: Long
@@ -300,9 +300,10 @@ class TransportViewModel(
                         velocity = 100
                     )
                 )
-                sendRepeaterMidi(routeResult.extraMidi)
+                sendRepeaterMidi(pageIndex, routeResult.extraMidi)
                 if (routeResult.passThrough) {
-                    midiEngine.sendNoteOn(
+                    sendPageNoteOnLocked(
+                        pageIndex = pageIndex,
                         channel = config.midiChannel,
                         note = note,
                         velocity = 100
@@ -386,16 +387,41 @@ class TransportViewModel(
         runtime.lastSentCcValue = null
     }
 
-    private fun sendRepeaterMidi(messages: List<RptrMidiOut>) {
+    private fun sendPageNoteOnLocked(pageIndex: Int, channel: Int, note: Int, velocity: Int) {
+        midiEngine.sendNoteOn(channel = channel, note = note, velocity = velocity)
+        activeMidiNotes.registerNoteOn(pageIndex = pageIndex, channel = channel, note = note)
+    }
+
+    private fun releasePageNoteLocked(pageIndex: Int, channel: Int, note: Int) {
+        if (activeMidiNotes.releaseNote(pageIndex = pageIndex, channel = channel, note = note)) {
+            midiEngine.sendNoteOff(channel = channel, note = note)
+        }
+    }
+
+    private fun releasePageNotesLocked(pageIndex: Int) {
+        activeMidiNotes.releasePage(pageIndex).forEach { key ->
+            midiEngine.sendNoteOff(channel = key.channel, note = key.note)
+        }
+    }
+
+    private fun releaseAllNotesLocked() {
+        activeMidiNotes.releaseAll().forEach { key ->
+            midiEngine.sendNoteOff(channel = key.channel, note = key.note)
+        }
+    }
+
+    private fun sendRepeaterMidi(pageIndex: Int, messages: List<RptrMidiOut>) {
         messages.forEach { message ->
             when (message) {
-                is RptrMidiOut.NoteOn -> midiEngine.sendNoteOn(
+                is RptrMidiOut.NoteOn -> sendPageNoteOnLocked(
+                    pageIndex = pageIndex,
                     channel = message.channel,
                     note = message.note,
                     velocity = message.velocity
                 )
 
-                is RptrMidiOut.NoteOff -> midiEngine.sendNoteOff(
+                is RptrMidiOut.NoteOff -> releasePageNoteLocked(
+                    pageIndex = pageIndex,
                     channel = message.channel,
                     note = message.note
                 )
@@ -405,7 +431,7 @@ class TransportViewModel(
 
     private fun sendAndClearPendingNoteOffs(runtime: PageRuntime) {
         runtime.scheduledNoteOffs.forEach { scheduled ->
-            midiEngine.sendNoteOff(channel = scheduled.channel, note = scheduled.note)
+            releasePageNoteLocked(runtime.pageIndex, scheduled.channel, scheduled.note)
         }
         runtime.scheduledNoteOffs.clear()
     }
@@ -413,8 +439,9 @@ class TransportViewModel(
     private fun clearPageRuntimeLocked(pageIndex: Int) {
         pageRuntimes.remove(pageIndex)?.let { runtime ->
             val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = latestClockTick)
-            sendRepeaterMidi(stopResult.midi)
+            sendRepeaterMidi(pageIndex, stopResult.midi)
             sendAndClearPendingNoteOffs(runtime)
+            releasePageNotesLocked(pageIndex)
             clearCcSlewState(runtime)
         }
     }
@@ -446,9 +473,10 @@ class TransportViewModel(
             runtimeMutex.withLock {
                 pageRuntimes.values.forEach { runtime ->
                     val stopResult = runtime.repeaterEngine.onTransportStop(currentTick = 0L)
-                    sendRepeaterMidi(stopResult.midi)
+                    sendRepeaterMidi(runtime.pageIndex, stopResult.midi)
                     sendAndClearPendingNoteOffs(runtime)
                 }
+                releaseAllNotesLocked()
                 syncRptrUiState()
             }
         }
