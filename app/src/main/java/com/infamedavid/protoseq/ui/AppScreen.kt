@@ -463,63 +463,58 @@ fun AppScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 10.dp, bottom = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(top = 8.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                OutlinedButton(
-                    onClick = {
-                        presetNameInput = ""
-                        saveDialogValidationMessage = ""
-                        showSaveStateDialog = true
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = ProtoControlShape
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "SAVE")
-                }
+                    OutlinedButton(
+                        onClick = {
+                            presetNameInput = ""
+                            saveDialogValidationMessage = ""
+                            showSaveStateDialog = true
+                        },
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        shape = ProtoControlShape
+                    ) {
+                        Text(text = "SAVE")
+                    }
 
-                OutlinedButton(
-                    onClick = {
-                        sessionStore.listPresets()
-                            .onSuccess { presets ->
-                                savedPresets = presets
-                                if (presets.isEmpty()) {
-                                    sessionStatusMessage = "No saved presets found"
-                                } else {
-                                    showLoadStateDialog = true
+                    OutlinedButton(
+                        onClick = {
+                            sessionStore.listPresets()
+                                .onSuccess { presets ->
+                                    savedPresets = presets
+                                    if (presets.isEmpty()) {
+                                        sessionStatusMessage = "No saved presets found"
+                                    } else {
+                                        showLoadStateDialog = true
+                                    }
                                 }
-                            }
-                            .onFailure {
-                                sessionStatusMessage = "Could not load preset"
-                            }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = ProtoControlShape
-                ) {
-                    Text(text = "LOAD")
-                }
+                                .onFailure {
+                                    sessionStatusMessage = "Could not load preset"
+                                }
+                        },
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        shape = ProtoControlShape
+                    ) {
+                        Text(text = "LOAD")
+                    }
 
-                OutlinedButton(
-                    onClick = { showAboutDialog = true },
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(40.dp),
-                    shape = ProtoControlShape
-                ) {
-                    Text(text = "ABOUT")
+                    OutlinedButton(
+                        onClick = { showAboutDialog = true },
+                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
+                        shape = ProtoControlShape
+                    ) {
+                        Text(text = "ABOUT")
+                    }
                 }
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 2.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
+                Spacer(modifier = Modifier.weight(1f))
+
                 Image(
                     painter = painterResource(id = R.drawable.protoseq_wordmark),
                     contentDescription = "Protoseq",
