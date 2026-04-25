@@ -3,6 +3,7 @@ package com.infamedavid.protoseq.ui.sequencers
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,7 +12,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
@@ -72,6 +72,10 @@ fun Grid616Panel(
     var editingCell by remember { mutableStateOf<Grid616CellRef?>(null) }
     var velocityDraft by remember { mutableFloatStateOf(GRID_616_MIN_VELOCITY.toFloat()) }
     var delayDraft by remember { mutableFloatStateOf(0f) }
+    var editingTrackNoteIndex by remember { mutableStateOf<Int?>(null) }
+    var noteDraft by remember { mutableStateOf(60) }
+    var editingTrackLengthIndex by remember { mutableStateOf<Int?>(null) }
+    var lengthDraft by remember { mutableStateOf(GRID_616_MAX_STEPS) }
 
     fun applyState(nextState: Grid616SequencerUiState) {
         onStateChange(nextState.normalized())
@@ -146,33 +150,13 @@ fun Grid616Panel(
                 TrackHeader(
                     trackIndex = trackIndex,
                     track = track,
-                    onDecrementNote = {
-                        applyState(
-                            state.updateTrack(trackIndex) {
-                                it.copy(note = (it.note - 1).coerceIn(0, 127))
-                            }
-                        )
+                    onEditNote = {
+                        editingTrackNoteIndex = trackIndex
+                        noteDraft = track.note
                     },
-                    onIncrementNote = {
-                        applyState(
-                            state.updateTrack(trackIndex) {
-                                it.copy(note = (it.note + 1).coerceIn(0, 127))
-                            }
-                        )
-                    },
-                    onDecrementLength = {
-                        applyState(
-                            state.updateTrack(trackIndex) {
-                                it.copy(length = (it.length - 1).coerceIn(GRID_616_MIN_TRACK_LENGTH, GRID_616_MAX_TRACK_LENGTH))
-                            }
-                        )
-                    },
-                    onIncrementLength = {
-                        applyState(
-                            state.updateTrack(trackIndex) {
-                                it.copy(length = (it.length + 1).coerceIn(GRID_616_MIN_TRACK_LENGTH, GRID_616_MAX_TRACK_LENGTH))
-                            }
-                        )
+                    onEditLength = {
+                        editingTrackLengthIndex = trackIndex
+                        lengthDraft = track.length
                     },
                     onToggleMute = {
                         applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
@@ -279,16 +263,109 @@ fun Grid616Panel(
             }
         )
     }
+
+    val openNoteEditorTrack = editingTrackNoteIndex
+    if (openNoteEditorTrack != null) {
+        AlertDialog(
+            onDismissRequest = { editingTrackNoteIndex = null },
+            title = { Text("Track ${openNoteEditorTrack + 1} Note") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = midiNoteToDisplay(noteDraft),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedButton(
+                            onClick = { noteDraft = (noteDraft - 1).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("-")
+                        }
+                        OutlinedButton(
+                            onClick = { noteDraft = (noteDraft + 1).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("+")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        applyState(
+                            state.updateTrack(openNoteEditorTrack) {
+                                it.copy(note = noteDraft.coerceIn(0, 127))
+                            }
+                        )
+                        editingTrackNoteIndex = null
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingTrackNoteIndex = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    val openLengthEditorTrack = editingTrackLengthIndex
+    if (openLengthEditorTrack != null) {
+        AlertDialog(
+            onDismissRequest = { editingTrackLengthIndex = null },
+            title = { Text("Track ${openLengthEditorTrack + 1} Length") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "L$lengthDraft",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Slider(
+                        value = lengthDraft.toFloat(),
+                        onValueChange = {
+                            lengthDraft = it.toInt().coerceIn(
+                                GRID_616_MIN_TRACK_LENGTH,
+                                GRID_616_MAX_TRACK_LENGTH
+                            )
+                        },
+                        valueRange = GRID_616_MIN_TRACK_LENGTH.toFloat()..GRID_616_MAX_TRACK_LENGTH.toFloat(),
+                        steps = GRID_616_MAX_TRACK_LENGTH - GRID_616_MIN_TRACK_LENGTH - 1
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        applyState(
+                            state.updateTrack(openLengthEditorTrack) {
+                                it.copy(
+                                    length = lengthDraft.coerceIn(
+                                        GRID_616_MIN_TRACK_LENGTH,
+                                        GRID_616_MAX_TRACK_LENGTH
+                                    )
+                                )
+                            }
+                        )
+                        editingTrackLengthIndex = null
+                    }
+                ) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { editingTrackLengthIndex = null }) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
 private fun TrackHeader(
     trackIndex: Int,
     track: Grid616TrackState,
-    onDecrementNote: () -> Unit,
-    onIncrementNote: () -> Unit,
-    onDecrementLength: () -> Unit,
-    onIncrementLength: () -> Unit,
+    onEditNote: () -> Unit,
+    onEditLength: () -> Unit,
     onToggleMute: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -302,59 +379,50 @@ private fun TrackHeader(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
-        CompactAdjustRow(
-            label = midiNoteToDisplay(track.note),
-            onDecrement = onDecrementNote,
-            onIncrement = onIncrementNote,
+        CompactClickableField(
+            text = midiNoteToDisplay(track.note),
+            onClick = onEditNote,
         )
-        CompactAdjustRow(
-            label = "L${track.length}",
-            onDecrement = onDecrementLength,
-            onIncrement = onIncrementLength,
+        CompactClickableField(
+            text = "L${track.length}",
+            onClick = onEditLength,
         )
-        OutlinedButton(
+        CompactClickableField(
+            text = "M",
             onClick = onToggleMute,
-            shape = ProtoControlShape,
-            modifier = Modifier.height(30.dp)
-        ) {
-            Text(
-                text = "M",
-                color = if (track.muted) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-            )
-        }
+            active = track.muted
+        )
     }
 }
 
 @Composable
-private fun CompactAdjustRow(
-    label: String,
-    onDecrement: () -> Unit,
-    onIncrement: () -> Unit,
+private fun CompactClickableField(
+    text: String,
+    onClick: () -> Unit,
+    active: Boolean = false,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    val background = if (active) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+    val border = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(ProtoControlShape)
+            .background(background)
+            .border(width = 1.dp, color = border, shape = ProtoControlShape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 2.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center
     ) {
-        OutlinedButton(
-            onClick = onDecrement,
-            shape = ProtoControlShape,
-            modifier = Modifier.height(26.dp)
-        ) {
-            Text(text = "-")
-        }
         Text(
-            text = label,
+            text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        OutlinedButton(
-            onClick = onIncrement,
-            shape = ProtoControlShape,
-            modifier = Modifier.height(26.dp)
-        ) {
-            Text(text = "+")
-        }
     }
 }
 
