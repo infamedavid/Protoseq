@@ -339,7 +339,11 @@ fun AppScreen() {
                     sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
                         when (page.selectedSequencerType) {
                             SequencerType.TURING_MACHINE -> page.copy(turingState = StochasticSequencerUiState())
-                            SequencerType.GRID_616 -> page.copy(grid616State = Grid616SequencerUiState())
+                            SequencerType.GRID_616 -> page.copy(
+                                grid616State = Grid616SequencerUiState(
+                                    crptState = page.grid616State.crptState
+                                ).normalized()
+                            )
                             SequencerType.EMPTY -> page
                         }
                     }
