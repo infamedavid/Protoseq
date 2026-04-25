@@ -3,7 +3,7 @@ package com.infamedavid.protoseq.features.grid616
 const val GRID_616_TRACK_COUNT = 6
 const val GRID_616_MAX_STEPS = 16
 const val GRID_616_TICKS_PER_STEP = 24
-const val GRID_616_GATE_TICKS = 1
+const val GRID_616_GATE_TICKS = 3
 const val GRID_616_MIN_TRACK_LENGTH = 1
 const val GRID_616_MAX_TRACK_LENGTH = 16
 const val GRID_616_MIN_DELAY_TICKS = 0
