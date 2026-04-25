@@ -59,6 +59,7 @@ data class Grid616SequencerUiState(
     val midiChannel: Int = 10,
     val swingAmount: Float = 0f,
     val tracks: List<Grid616TrackState> = defaultGrid616Tracks(),
+    val crptState: Grid616CrptState = Grid616CrptState(),
 )
 
 fun Grid616SequencerUiState.normalized(): Grid616SequencerUiState {
@@ -73,5 +74,6 @@ fun Grid616SequencerUiState.normalized(): Grid616SequencerUiState {
         midiChannel = midiChannel.coerceIn(1, 16),
         swingAmount = swingAmount.coerceIn(0f, 0.75f),
         tracks = normalizedTracks,
+        crptState = crptState.normalized(),
     )
 }
