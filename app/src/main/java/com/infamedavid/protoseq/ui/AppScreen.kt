@@ -49,6 +49,7 @@ import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.session.ProtoseqSessionPresetSummary
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.normalized
+import com.infamedavid.protoseq.features.grid616.toConfig as toGrid616Config
 import com.infamedavid.protoseq.features.session.ProtoseqSessionStore
 import com.infamedavid.protoseq.features.sequencer.SequencerType
 import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionState
@@ -58,6 +59,7 @@ import com.infamedavid.protoseq.features.sequencer.updatePage
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
+import com.infamedavid.protoseq.features.transport.Grid616PageConfig
 import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
@@ -143,6 +145,23 @@ fun AppScreen() {
 
     LaunchedEffect(turingPageConfigs) {
         transportViewModel.updateTuringPageConfigs(turingPageConfigs)
+    }
+
+    val grid616PageConfigs = remember(sessionState.pages) {
+        sessionState.pages
+            .filter {
+                it.selectedSequencerType == SequencerType.GRID_616 && it.enabled
+            }
+            .map { page ->
+                Grid616PageConfig(
+                    pageIndex = page.pageIndex,
+                    config = page.grid616State.toGrid616Config()
+                )
+            }
+    }
+
+    LaunchedEffect(grid616PageConfigs) {
+        transportViewModel.updateGrid616PageConfigs(grid616PageConfigs)
     }
 
     Surface(
