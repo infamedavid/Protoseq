@@ -68,6 +68,7 @@ private val Grid616TrackBlockWidth =
 fun Grid616Panel(
     state: Grid616SequencerUiState,
     onStateChange: (Grid616SequencerUiState) -> Unit,
+    onBeforeCrptSet: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     var editingCell by remember { mutableStateOf<Grid616CellRef?>(null) }
@@ -259,16 +260,15 @@ fun Grid616Panel(
                 },
                 onSet = {
                     val snapshot = state.crptState.snapshot
-                    applyState(
-                        if (snapshot != null) {
+                    if (snapshot != null) {
+                        onBeforeCrptSet()
+                        applyState(
                             state.applyCrptSnapshotWithMutation(
                                 snapshot = snapshot,
                                 rndmAmount = state.crptState.rndmAmount
-                            ).normalized()
-                        } else {
-                            state
-                        }
-                    )
+                            )
+                        )
+                    }
                 },
                 onRndmChange = { value ->
                     applyState(

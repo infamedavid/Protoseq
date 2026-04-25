@@ -509,6 +509,9 @@ fun AppScreen() {
                                 page.copy(grid616State = nextState.normalized())
                             }
                         },
+                        onBeforeCrptSet = {
+                            transportViewModel.prepareGrid616PageForPatternReplace(currentPage.pageIndex)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 12.dp)

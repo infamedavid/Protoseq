@@ -252,6 +252,14 @@ class TransportViewModel(
         }
     }
 
+    fun prepareGrid616PageForPatternReplace(pageIndex: Int) {
+        vmScope.launch {
+            runtimeMutex.withLock {
+                prepareGrid616PageForPatternReplaceLocked(pageIndex)
+            }
+        }
+    }
+
     fun pressRptr(pageIndex: Int, division: RptrDivision, config: StochasticSequencerConfig) {
         vmScope.launch {
             runtimeMutex.withLock {
@@ -585,6 +593,14 @@ class TransportViewModel(
     private fun clearGrid616ScheduledEvents(runtime: Grid616PageRuntime) {
         runtime.scheduledTriggers.clear()
         runtime.scheduledNoteOffs.clear()
+    }
+
+    private fun prepareGrid616PageForPatternReplaceLocked(pageIndex: Int) {
+        val runtime = grid616PageRuntimes[pageIndex]
+        if (runtime != null) {
+            clearGrid616ScheduledEvents(runtime)
+        }
+        releasePageNotesLocked(pageIndex)
     }
 
     private fun clearGrid616PageRuntimeLocked(pageIndex: Int) {
