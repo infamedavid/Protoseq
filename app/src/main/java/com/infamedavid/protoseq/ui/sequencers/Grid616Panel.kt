@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.infamedavid.protoseq.features.grid616.GRID_616_CRPT_SLOT_COUNT
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_DELAY_TICKS
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_STEPS
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_TRACK_LENGTH
@@ -46,11 +47,12 @@ import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_VELOCITY
 import com.infamedavid.protoseq.features.grid616.GRID_616_TRACK_COUNT
 import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
+import com.infamedavid.protoseq.features.grid616.Grid616CrptSlotState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
-import com.infamedavid.protoseq.features.grid616.applyCrptSnapshotWithMutation
 import com.infamedavid.protoseq.features.grid616.normalized
-import com.infamedavid.protoseq.features.grid616.toCrptSnapshot
+import com.infamedavid.protoseq.features.grid616.withAppliedCrptSnapshot
+import com.infamedavid.protoseq.features.grid616.withSavedCrptSnapshot
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
@@ -247,31 +249,16 @@ fun Grid616Panel(
             Spacer(modifier = Modifier.width(6.dp))
 
             CrptControls(
-                hasSnapshot = state.crptState.slots.firstOrNull()?.snapshot != null,
+                slots = state.crptState.slots,
                 rndmAmount = state.crptState.rndmAmount,
-                onSave = {
-                    applyState(
-                        state.copy(
-                            crptState = state.crptState.copy(
-                                slots = state.crptState.slots.toMutableList().apply {
-                                    if (isNotEmpty()) {
-                                        this[0] = this[0].copy(snapshot = state.toCrptSnapshot())
-                                    }
-                                }
-                            )
-                        ).normalized()
-                    )
+                onSaveSlot = { slotIndex ->
+                    applyState(state.withSavedCrptSnapshot(slotIndex))
                 },
-                onSet = {
-                    val snapshot = state.crptState.slots.firstOrNull()?.snapshot
+                onSetSlot = { slotIndex ->
+                    val snapshot = state.crptState.slots.getOrNull(slotIndex)?.snapshot
                     if (snapshot != null) {
                         onBeforeCrptSet()
-                        applyState(
-                            state.applyCrptSnapshotWithMutation(
-                                snapshot = snapshot,
-                                rndmAmount = state.crptState.rndmAmount
-                            )
-                        )
+                        applyState(state.withAppliedCrptSnapshot(slotIndex))
                     }
                 },
                 onRndmChange = { value ->
@@ -283,7 +270,7 @@ fun Grid616Panel(
                         )
                     )
                 },
-                modifier = Modifier.widthIn(max = 120.dp)
+                modifier = Modifier.widthIn(max = 132.dp)
             )
         }
     }
@@ -472,10 +459,10 @@ fun Grid616Panel(
 
 @Composable
 private fun CrptControls(
-    hasSnapshot: Boolean,
+    slots: List<Grid616CrptSlotState>,
     rndmAmount: Float,
-    onSave: () -> Unit,
-    onSet: () -> Unit,
+    onSaveSlot: (Int) -> Unit,
+    onSetSlot: (Int) -> Unit,
     onRndmChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -483,31 +470,6 @@ private fun CrptControls(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OutlinedButton(
-                onClick = onSave,
-                shape = ProtoControlShape,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                modifier = Modifier.height(30.dp)
-            ) {
-                Text("SAVE", style = MaterialTheme.typography.labelSmall)
-            }
-            OutlinedButton(
-                onClick = onSet,
-                enabled = hasSnapshot,
-                shape = ProtoControlShape,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                modifier = Modifier.height(30.dp)
-            ) {
-                Text("SET", style = MaterialTheme.typography.labelSmall)
-            }
-        }
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -528,8 +490,38 @@ private fun CrptControls(
             value = rndmAmount.coerceIn(0f, 1f),
             onValueChange = onRndmChange,
             valueRange = 0f..1f,
-            modifier = Modifier.height(28.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp)
         )
+
+        repeat(GRID_616_CRPT_SLOT_COUNT) { slotIndex ->
+            val hasSnapshot = slots.getOrNull(slotIndex)?.snapshot != null
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = { onSaveSlot(slotIndex) },
+                    shape = ProtoControlShape,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Text("SAVE", style = MaterialTheme.typography.labelSmall)
+                }
+                OutlinedButton(
+                    onClick = { onSetSlot(slotIndex) },
+                    enabled = hasSnapshot,
+                    shape = ProtoControlShape,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                    modifier = Modifier.height(30.dp)
+                ) {
+                    Text("SET", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+        }
     }
 }
 
