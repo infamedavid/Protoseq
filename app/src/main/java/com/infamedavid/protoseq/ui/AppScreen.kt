@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -63,8 +64,7 @@ import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
 @Composable
-fun AppScreen(
-) {
+fun AppScreen() {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val appVersion = remember(context) {
@@ -102,6 +102,7 @@ fun AppScreen(
     var sessionStatusMessage by rememberSaveable { mutableStateOf("") }
     var savedPresets by remember { mutableStateOf<List<ProtoseqSessionPresetSummary>>(emptyList()) }
     val sessionStore = remember(context) { ProtoseqSessionStore(context) }
+
     var sessionState by remember {
         mutableStateOf(
             createDefaultProtoseqSessionState().updatePage(pageIndex = 0) { page ->
@@ -112,6 +113,7 @@ fun AppScreen(
             }
         )
     }
+
     val currentPage = sessionState.currentPage()
     val currentTuringState = currentPage.turingState
 
@@ -297,6 +299,7 @@ fun AppScreen(
                 },
                 modifier = Modifier.padding(top = 12.dp)
             )
+
             Spacer(modifier = Modifier.height(10.dp))
 
             SelectedSlotHeader(
@@ -323,6 +326,7 @@ fun AppScreen(
                     }
                 }
             )
+
             Spacer(modifier = Modifier.height(8.dp))
 
             when (currentPage.selectedSequencerType) {
@@ -345,13 +349,19 @@ fun AppScreen(
                         gateLength = currentTuringState.gateLength,
                         randomGateLength = currentTuringState.randomGateLength,
                         onLockPositionChange = { value ->
-                            updateCurrentTuringState { it.copy(lockPosition = value.coerceIn(-1f, 1f)) }
+                            updateCurrentTuringState {
+                                it.copy(lockPosition = value.coerceIn(-1f, 1f))
+                            }
                         },
                         onSequenceLengthChange = { length ->
-                            updateCurrentTuringState { it.copy(sequenceLength = length.coerceIn(2, 64)) }
+                            updateCurrentTuringState {
+                                it.copy(sequenceLength = length.coerceIn(2, 64))
+                            }
                         },
                         onSlewAmountChange = { value ->
-                            updateCurrentTuringState { it.copy(slewAmount = value.coerceIn(0f, 1f)) }
+                            updateCurrentTuringState {
+                                it.copy(slewAmount = value.coerceIn(0f, 1f))
+                            }
                         },
                         onBernoulliProbabilityChange = { value ->
                             updateCurrentTuringState {
@@ -364,13 +374,19 @@ fun AppScreen(
                             }
                         },
                         onPitchOffsetChange = { value ->
-                            updateCurrentTuringState { it.copy(pitchOffset = value.coerceIn(-24, 24)) }
+                            updateCurrentTuringState {
+                                it.copy(pitchOffset = value.coerceIn(-24, 24))
+                            }
                         },
                         onGateLengthChange = { value ->
-                            updateCurrentTuringState { it.copy(gateLength = value.coerceIn(0f, 1f)) }
+                            updateCurrentTuringState {
+                                it.copy(gateLength = value.coerceIn(0f, 1f))
+                            }
                         },
                         onRandomGateLengthChange = { value ->
-                            updateCurrentTuringState { it.copy(randomGateLength = value.coerceIn(0f, 1f)) }
+                            updateCurrentTuringState {
+                                it.copy(randomGateLength = value.coerceIn(0f, 1f))
+                            }
                         },
                         outputMode = currentTuringState.outputMode,
                         midiChannel = currentTuringState.midiChannel,
@@ -414,17 +430,17 @@ fun AppScreen(
                             }
                         },
                         rptrIsRuntimeActive = (
-                            transportState.rptrStatesByPage[currentPage.pageIndex]
-                                ?: RptrUiRuntimeState.Idle
-                            ) != RptrUiRuntimeState.Idle,
+                                transportState.rptrStatesByPage[currentPage.pageIndex]
+                                    ?: RptrUiRuntimeState.Idle
+                                ) != RptrUiRuntimeState.Idle,
                         activeRptrDivision = transportState.activeRptrDivisionsByPage[currentPage.pageIndex],
                         rptrBaseUnits = currentTuringState.rptrBaseUnits,
                         rptrStartMode = currentTuringState.rptrStartMode,
                         showRptrBasePickerDialog = showRptrBasePickerDialog,
                         pageRuntimeEnabled = (
-                            currentPage.enabled &&
-                                currentPage.selectedSequencerType == SequencerType.TURING_MACHINE
-                            ),
+                                currentPage.enabled &&
+                                        currentPage.selectedSequencerType == SequencerType.TURING_MACHINE
+                                ),
                         onShowRptrBasePickerDialogChange = { showRptrBasePickerDialog = it },
                         onDecrementRptrBaseUnits = {
                             updateCurrentTuringState {
@@ -437,7 +453,9 @@ fun AppScreen(
                             }
                         },
                         onSetRptrBaseUnits = { value ->
-                            updateCurrentTuringState { it.copy(rptrBaseUnits = value.coerceAtLeast(1)) }
+                            updateCurrentTuringState {
+                                it.copy(rptrBaseUnits = value.coerceAtLeast(1))
+                            }
                         },
                         onSetRptrStartMode = { mode ->
                             updateCurrentTuringState { it.copy(rptrStartMode = mode) }
@@ -449,7 +467,9 @@ fun AppScreen(
                                 config = currentTuringState.toConfig()
                             )
                         },
-                        onReleaseRptr = { transportViewModel.releaseRptr(currentPage.pageIndex) },
+                        onReleaseRptr = {
+                            transportViewModel.releaseRptr(currentPage.pageIndex)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 12.dp)
@@ -471,15 +491,33 @@ fun AppScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     OutlinedButton(
+                        onClick = { showAboutDialog = true },
+                        modifier = Modifier.size(width = 52.dp, height = 44.dp),
+                        shape = ProtoControlShape,
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.protoseq_mark),
+                            contentDescription = "About",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    OutlinedButton(
                         onClick = {
                             presetNameInput = ""
                             saveDialogValidationMessage = ""
                             showSaveStateDialog = true
                         },
-                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
-                        shape = ProtoControlShape
+                        modifier = Modifier.size(width = 92.dp, height = 44.dp),
+                        shape = ProtoControlShape,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        Text(text = "SAVE")
+                        Text(
+                            text = "SAVE",
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
 
                     OutlinedButton(
@@ -497,21 +535,17 @@ fun AppScreen(
                                     sessionStatusMessage = "Could not load preset"
                                 }
                         },
-                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
-                        shape = ProtoControlShape
+                        modifier = Modifier.size(width = 92.dp, height = 44.dp),
+                        shape = ProtoControlShape,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
-                        Text(text = "LOAD")
-                    }
-
-                    OutlinedButton(
-                        onClick = { showAboutDialog = true },
-                        modifier = Modifier.size(width = 60.dp, height = 44.dp),
-                        shape = ProtoControlShape
-                    ) {
-                        Text(text = "ABOUT")
+                        Text(
+                            text = "LOAD",
+                            maxLines = 1,
+                            softWrap = false
+                        )
                     }
                 }
-            }
 
                 Spacer(modifier = Modifier.weight(1f))
 
