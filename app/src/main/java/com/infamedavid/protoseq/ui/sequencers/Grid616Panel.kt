@@ -247,19 +247,23 @@ fun Grid616Panel(
             Spacer(modifier = Modifier.width(6.dp))
 
             CrptControls(
-                hasSnapshot = state.crptState.snapshot != null,
+                hasSnapshot = state.crptState.slots.firstOrNull()?.snapshot != null,
                 rndmAmount = state.crptState.rndmAmount,
                 onSave = {
                     applyState(
                         state.copy(
                             crptState = state.crptState.copy(
-                                snapshot = state.toCrptSnapshot()
+                                slots = state.crptState.slots.toMutableList().apply {
+                                    if (isNotEmpty()) {
+                                        this[0] = this[0].copy(snapshot = state.toCrptSnapshot())
+                                    }
+                                }
                             )
                         ).normalized()
                     )
                 },
                 onSet = {
-                    val snapshot = state.crptState.snapshot
+                    val snapshot = state.crptState.slots.firstOrNull()?.snapshot
                     if (snapshot != null) {
                         onBeforeCrptSet()
                         applyState(

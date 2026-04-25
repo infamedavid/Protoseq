@@ -2,8 +2,14 @@ package com.infamedavid.protoseq.features.grid616
 
 import kotlin.random.Random
 
+const val GRID_616_CRPT_SLOT_COUNT = 6
+
 data class Grid616CrptState(
     val rndmAmount: Float = 0f,
+    val slots: List<Grid616CrptSlotState> = defaultGrid616CrptSlots(),
+)
+
+data class Grid616CrptSlotState(
     val snapshot: Grid616CrptSnapshot? = null,
 )
 
@@ -23,6 +29,22 @@ data class Grid616CrptStepSnapshot(
     val velocity: Int,
     val delayTicks: Int,
 )
+
+fun defaultGrid616CrptSlots(): List<Grid616CrptSlotState> =
+    List(GRID_616_CRPT_SLOT_COUNT) { Grid616CrptSlotState() }
+
+fun Grid616CrptSlotState.normalized(): Grid616CrptSlotState =
+    copy(snapshot = snapshot?.normalized())
+
+fun normalizeGrid616CrptSlots(slots: List<Grid616CrptSlotState>): List<Grid616CrptSlotState> =
+    slots
+        .map { it.normalized() }
+        .take(GRID_616_CRPT_SLOT_COUNT)
+        .let { existing ->
+            existing + List((GRID_616_CRPT_SLOT_COUNT - existing.size).coerceAtLeast(0)) {
+                Grid616CrptSlotState()
+            }
+        }
 
 fun Grid616CrptStepSnapshot.normalized(): Grid616CrptStepSnapshot =
     copy(
@@ -78,7 +100,7 @@ fun Grid616CrptSnapshot.normalized(): Grid616CrptSnapshot {
 fun Grid616CrptState.normalized(): Grid616CrptState =
     copy(
         rndmAmount = rndmAmount.coerceIn(0f, 1f),
-        snapshot = snapshot?.normalized(),
+        slots = normalizeGrid616CrptSlots(slots),
     )
 
 fun Grid616SequencerUiState.toCrptSnapshot(): Grid616CrptSnapshot =
@@ -173,21 +195,34 @@ fun Grid616SequencerUiState.applyCrptSnapshotWithMutation(
     return baseState.copy(tracks = mergedTracks).normalized()
 }
 
-fun Grid616SequencerUiState.withSavedCrptSnapshot(): Grid616SequencerUiState =
-    copy(
-        crptState = crptState.copy(snapshot = toCrptSnapshot()),
-    ).normalized()
+fun Grid616SequencerUiState.withSavedCrptSnapshot(slotIndex: Int): Grid616SequencerUiState {
+    val baseState = normalized()
+    if (slotIndex !in 0 until GRID_616_CRPT_SLOT_COUNT) {
+        return baseState
+    }
 
-fun Grid616SequencerUiState.withAppliedCrptSnapshot(): Grid616SequencerUiState =
-    withAppliedCrptSnapshot(Random.Default)
+    val updatedSlots = baseState.crptState.slots.toMutableList().apply {
+        this[slotIndex] = this[slotIndex].copy(snapshot = baseState.toCrptSnapshot())
+    }
+
+    return baseState.copy(
+        crptState = baseState.crptState.copy(slots = updatedSlots),
+    ).normalized()
+}
 
 fun Grid616SequencerUiState.withAppliedCrptSnapshot(
-    random: Random,
+    slotIndex: Int,
+    random: Random = Random.Default,
 ): Grid616SequencerUiState {
-    val snapshot = crptState.snapshot ?: return normalized()
-    return applyCrptSnapshotWithMutation(
+    val baseState = normalized()
+    if (slotIndex !in 0 until GRID_616_CRPT_SLOT_COUNT) {
+        return baseState
+    }
+
+    val snapshot = baseState.crptState.slots[slotIndex].snapshot ?: return baseState
+    return baseState.applyCrptSnapshotWithMutation(
         snapshot = snapshot,
-        rndmAmount = crptState.rndmAmount,
+        rndmAmount = baseState.crptState.rndmAmount,
         random = random,
-    )
+    ).copy(crptState = baseState.crptState).normalized()
 }

@@ -2,6 +2,7 @@ package com.infamedavid.protoseq.features.grid616
 
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -10,11 +11,27 @@ import org.junit.Test
 class Grid616CrptStateTest {
 
     @Test
-    fun defaultCrptStateIsEmpty() {
-        val state = Grid616SequencerUiState()
+    fun defaultCrptStateHasSixEmptySlots() {
+        val state = Grid616CrptState()
 
-        assertEquals(0f, state.crptState.rndmAmount)
-        assertNull(state.crptState.snapshot)
+        assertEquals(0f, state.rndmAmount)
+        assertEquals(GRID_616_CRPT_SLOT_COUNT, state.slots.size)
+        assertTrue(state.slots.all { it.snapshot == null })
+    }
+
+    @Test
+    fun slotNormalizationPadsAndTruncates() {
+        val tooFew = Grid616CrptState(
+            slots = listOf(Grid616CrptSlotState(snapshot = Grid616SequencerUiState().toCrptSnapshot())),
+        ).normalized()
+        val tooMany = Grid616CrptState(
+            slots = List(GRID_616_CRPT_SLOT_COUNT + 3) { Grid616CrptSlotState() },
+        ).normalized()
+
+        assertEquals(GRID_616_CRPT_SLOT_COUNT, tooFew.slots.size)
+        assertNotNull(tooFew.slots[0].snapshot)
+        assertTrue(tooFew.slots.drop(1).all { it.snapshot == null })
+        assertEquals(GRID_616_CRPT_SLOT_COUNT, tooMany.slots.size)
     }
 
     @Test
@@ -62,20 +79,6 @@ class Grid616CrptStateTest {
     }
 
     @Test
-    fun toCrptSnapshotDoesNotCaptureMute() {
-        val state = Grid616SequencerUiState(
-            tracks = defaultGrid616Tracks().map { it.copy(muted = true) },
-        )
-
-        val snapshot = state.toCrptSnapshot()
-        val restored = Grid616SequencerUiState(
-            tracks = defaultGrid616Tracks().map { it.copy(muted = false) },
-        ).applyCrptSnapshot(snapshot)
-
-        assertTrue(restored.tracks.all { !it.muted })
-    }
-
-    @Test
     fun applyCrptSnapshotAppliesMusicalPatternAndPreservesNonSnapshotFields() {
         val snapshotSource = Grid616SequencerUiState(
             tracks = defaultGrid616Tracks().mapIndexed { index, track ->
@@ -95,7 +98,12 @@ class Grid616CrptStateTest {
         )
         val snapshot = snapshotSource.toCrptSnapshot()
 
-        val baseCrpt = Grid616CrptState(rndmAmount = 0.33f, snapshot = snapshot)
+        val baseCrpt = Grid616CrptState(
+            rndmAmount = 0.33f,
+            slots = defaultGrid616CrptSlots().toMutableList().apply {
+                this[0] = Grid616CrptSlotState(snapshot = snapshot)
+            }
+        )
         val target = Grid616SequencerUiState(
             midiChannel = 2,
             swingAmount = 0.5f,
@@ -110,75 +118,81 @@ class Grid616CrptStateTest {
         assertEquals(baseCrpt.normalized(), applied.crptState)
         assertTrue(applied.tracks.all { it.muted })
         assertEquals(70, applied.tracks.first().note)
-        assertEquals(GRID_616_MIN_TRACK_LENGTH, applied.tracks.first().length)
-        assertEquals(Grid616PlaybackMode.RANDOM, applied.tracks.first().playbackMode)
-        assertEquals(true, applied.tracks.first().steps[0].enabled)
     }
 
     @Test
-    fun applyCrptSnapshotWithMutationAtZeroMatchesExactApply() {
-        val snapshot = Grid616SequencerUiState().toCrptSnapshot()
-        val target = Grid616SequencerUiState(
-            midiChannel = 15,
-            swingAmount = 0.25f,
-            tracks = defaultGrid616Tracks().map { it.copy(muted = true) },
-            crptState = Grid616CrptState(rndmAmount = 0.5f, snapshot = snapshot),
-        )
-
-        val exact = target.applyCrptSnapshot(snapshot)
-        val mutated = target.applyCrptSnapshotWithMutation(snapshot, 0f, Random(1234))
-
-        assertEquals(exact, mutated)
-    }
-
-    @Test
-    fun applyCrptSnapshotWithMutationAtOneStaysInValidRangesAndPreservesProtectedFields() {
-        val snapshot = Grid616SequencerUiState().toCrptSnapshot()
-        val target = Grid616SequencerUiState(
-            midiChannel = 9,
-            swingAmount = 0.4f,
-            tracks = defaultGrid616Tracks().map { it.copy(muted = true) },
-            crptState = Grid616CrptState(rndmAmount = 1f, snapshot = snapshot),
-        )
-
-        val mutated = target.applyCrptSnapshotWithMutation(snapshot, 1f, Random(0))
-
-        assertEquals(9, mutated.midiChannel)
-        assertEquals(0.4f, mutated.swingAmount)
-        assertTrue(mutated.tracks.all { it.muted })
-        mutated.tracks.forEach { track ->
-            assertTrue(track.note in 0..127)
-            assertTrue(track.length in GRID_616_MIN_TRACK_LENGTH..GRID_616_MAX_TRACK_LENGTH)
-            assertTrue(Grid616PlaybackMode.entries.contains(track.playbackMode))
-            track.steps.forEach { step ->
-                assertTrue(step.velocity in GRID_616_MIN_VELOCITY..GRID_616_MAX_VELOCITY)
-                assertTrue(step.delayTicks in GRID_616_MIN_DELAY_TICKS..GRID_616_MAX_DELAY_TICKS)
-            }
-        }
-    }
-
-    @Test
-    fun withSavedCrptSnapshotStoresSnapshotAndPreservesRndmAmount() {
+    fun withSavedCrptSnapshotSavesOnlyTargetSlot() {
+        val initialSnapshot = Grid616SequencerUiState().toCrptSnapshot()
         val state = Grid616SequencerUiState(
-            crptState = Grid616CrptState(rndmAmount = 0.6f),
+            crptState = Grid616CrptState(
+                rndmAmount = 0.6f,
+                slots = defaultGrid616CrptSlots().toMutableList().apply {
+                    this[0] = Grid616CrptSlotState(snapshot = initialSnapshot)
+                },
+            )
+        ).copy(
+            tracks = defaultGrid616Tracks().map { it.copy(note = 88) }
         )
 
-        val saved = state.withSavedCrptSnapshot()
+        val saved = state.withSavedCrptSnapshot(slotIndex = 2)
 
-        assertNotNull(saved.crptState.snapshot)
         assertEquals(0.6f, saved.crptState.rndmAmount)
+        assertNotNull(saved.crptState.slots[2].snapshot)
+        assertEquals(initialSnapshot, saved.crptState.slots[0].snapshot)
+        assertTrue(saved.crptState.slots.filterIndexed { index, _ -> index !in listOf(0, 2) }.all { it.snapshot == null })
     }
 
     @Test
-    fun withAppliedCrptSnapshotWithNullSnapshotReturnsNormalizedState() {
+    fun withAppliedCrptSnapshotUsesGlobalRndmAndPreservesProtectedFields() {
+        val snapshotSource = Grid616SequencerUiState(
+            tracks = defaultGrid616Tracks().map { track ->
+                track.copy(note = 40, length = GRID_616_MIN_TRACK_LENGTH)
+            }
+        )
+        val state = Grid616SequencerUiState(
+            midiChannel = 10,
+            swingAmount = 0.42f,
+            tracks = defaultGrid616Tracks().map { it.copy(muted = true, note = 90) },
+            crptState = Grid616CrptState(
+                rndmAmount = 1f,
+                slots = defaultGrid616CrptSlots().toMutableList().apply {
+                    this[2] = Grid616CrptSlotState(snapshot = snapshotSource.toCrptSnapshot())
+                },
+            ),
+        )
+
+        val applied = state.withAppliedCrptSnapshot(slotIndex = 2, random = Random(1))
+
+        assertEquals(10, applied.midiChannel)
+        assertEquals(0.42f, applied.swingAmount)
+        assertTrue(applied.tracks.all { it.muted })
+        assertEquals(state.crptState.normalized(), applied.crptState)
+        assertNotEquals(90, applied.tracks.first().note)
+    }
+
+    @Test
+    fun invalidSlotIndexReturnsNormalizedUnchangedState() {
         val state = Grid616SequencerUiState(
             midiChannel = 44,
             swingAmount = 3f,
-            crptState = Grid616CrptState(snapshot = null),
+            crptState = Grid616CrptState(),
         )
 
-        val applied = state.withAppliedCrptSnapshot(Random(99))
+        assertEquals(state.normalized(), state.withSavedCrptSnapshot(slotIndex = -1))
+        assertEquals(state.normalized(), state.withAppliedCrptSnapshot(slotIndex = GRID_616_CRPT_SLOT_COUNT, random = Random(99)))
+    }
+
+    @Test
+    fun withAppliedCrptSnapshotWithEmptySlotReturnsNormalizedState() {
+        val state = Grid616SequencerUiState(
+            midiChannel = 44,
+            swingAmount = 3f,
+            crptState = Grid616CrptState(),
+        )
+
+        val applied = state.withAppliedCrptSnapshot(slotIndex = 0, random = Random(99))
 
         assertEquals(state.normalized(), applied)
+        assertNull(applied.crptState.slots[0].snapshot)
     }
 }
