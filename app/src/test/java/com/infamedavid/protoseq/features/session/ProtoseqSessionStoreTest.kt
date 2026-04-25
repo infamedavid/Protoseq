@@ -8,10 +8,12 @@ import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_DELAY_TICKS
 import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_TRACK_LENGTH
 import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_VELOCITY
 import com.infamedavid.protoseq.features.grid616.GRID_616_TRACK_COUNT
+import com.infamedavid.protoseq.features.grid616.Grid616CrptState
 import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.withSavedCrptSnapshot
 import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.ProtoseqSessionState
 import com.infamedavid.protoseq.features.sequencer.SequencerType
@@ -20,7 +22,9 @@ import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -515,5 +519,333 @@ class ProtoseqSessionStoreTest {
 
         assertEquals(GRID_616_MAX_DELAY_TICKS, step.delayTicks)
         assertEquals(16, step.delayTicks)
+    }
+
+    @Test
+    fun grid616CrptEmptyStateRoundTripPreservesDefaults() {
+        val session = ProtoseqSessionState()
+            .updatePage(0) { page ->
+                page.copy(
+                    selectedSequencerType = SequencerType.GRID_616,
+                    grid616State = page.grid616State.copy(crptState = Grid616CrptState()),
+                )
+            }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val crpt = decoded.pages[0].grid616State.crptState
+
+        assertEquals(0f, crpt.rndmAmount)
+        assertNull(crpt.snapshot)
+    }
+
+    @Test
+    fun grid616CrptSnapshotRoundTripPreservesSnapshotContent() {
+        val session = ProtoseqSessionState().updatePage(0) { page ->
+            val patternGrid = page.grid616State.copy(
+                tracks = page.grid616State.tracks.toMutableList().apply {
+                    this[0] = this[0].copy(
+                        note = 62,
+                        length = 7,
+                        playbackMode = Grid616PlaybackMode.RANDOM,
+                        steps = this[0].steps.toMutableList().apply {
+                            this[0] = Grid616StepState(
+                                enabled = true,
+                                velocity = 99,
+                                delayTicks = 12,
+                            )
+                        },
+                    )
+                }
+            )
+            val savedGrid = patternGrid.withSavedCrptSnapshot()
+            val modifiedGrid = savedGrid.copy(
+                crptState = savedGrid.crptState.copy(rndmAmount = 0.5f),
+            )
+
+            page.copy(
+                selectedSequencerType = SequencerType.GRID_616,
+                grid616State = modifiedGrid,
+            )
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val crpt = decoded.pages[0].grid616State.crptState
+        val snapshot = crpt.snapshot
+
+        assertEquals(0.5f, crpt.rndmAmount)
+        assertNotNull(snapshot)
+        assertEquals(62, snapshot!!.tracks[0].note)
+        assertEquals(7, snapshot.tracks[0].length)
+        assertEquals(Grid616PlaybackMode.RANDOM, snapshot.tracks[0].playbackMode)
+        assertTrue(snapshot.tracks[0].steps[0].enabled)
+        assertEquals(99, snapshot.tracks[0].steps[0].velocity)
+        assertEquals(12, snapshot.tracks[0].steps[0].delayTicks)
+    }
+
+    @Test
+    fun grid616CrptSnapshotExcludesMuteWhileGridTrackMuteStillRoundTrips() {
+        val session = ProtoseqSessionState().updatePage(0) { page ->
+            val mutatedGrid = page.grid616State.copy(
+                tracks = page.grid616State.tracks.toMutableList().apply {
+                    this[0] = this[0].copy(muted = true)
+                },
+            ).withSavedCrptSnapshot()
+
+            page.copy(
+                selectedSequencerType = SequencerType.GRID_616,
+                grid616State = mutatedGrid,
+            )
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val grid = decoded.pages[0].grid616State
+
+        assertTrue(grid.tracks[0].muted)
+        assertNotNull(grid.crptState.snapshot)
+    }
+
+    @Test
+    fun missingGrid616CrptStateFallsBackToDefaults() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "tracks",
+                                    JSONArray().put(JSONObject().put("note", 40))
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(Grid616CrptState(), decoded.pages[0].grid616State.crptState)
+    }
+
+    @Test
+    fun nullGrid616CrptSnapshotLoadsAsNull() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "crptState",
+                                    JSONObject()
+                                        .put("rndmAmount", 0.8)
+                                        .put("snapshot", JSONObject.NULL)
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        val crpt = decoded.pages[0].grid616State.crptState
+
+        assertEquals(0.8f, crpt.rndmAmount)
+        assertNull(crpt.snapshot)
+    }
+
+    @Test
+    fun invalidGrid616CrptValuesNormalizeSafely() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "crptState",
+                                    JSONObject()
+                                        .put("rndmAmount", 9.0)
+                                        .put(
+                                            "snapshot",
+                                            JSONObject().put(
+                                                "tracks",
+                                                JSONArray().put(
+                                                    JSONObject()
+                                                        .put("note", 999)
+                                                        .put("length", 0)
+                                                        .put("playbackMode", "INVALID")
+                                                        .put(
+                                                            "steps",
+                                                            JSONArray().put(
+                                                                JSONObject()
+                                                                    .put("enabled", true)
+                                                                    .put("velocity", 999)
+                                                                    .put("delayTicks", 999)
+                                                            )
+                                                        )
+                                                )
+                                            )
+                                        )
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        val snapshot = decoded.pages[0].grid616State.crptState.snapshot!!
+        val track = snapshot.tracks[0]
+        val step = track.steps[0]
+
+        assertEquals(1f, decoded.pages[0].grid616State.crptState.rndmAmount)
+        assertEquals(127, track.note)
+        assertEquals(GRID_616_MIN_TRACK_LENGTH, track.length)
+        assertEquals(Grid616PlaybackMode.FORWARD, track.playbackMode)
+        assertEquals(GRID_616_MAX_VELOCITY, step.velocity)
+        assertEquals(GRID_616_MAX_DELAY_TICKS, step.delayTicks)
+    }
+
+    @Test
+    fun invalidGrid616CrptRndmAmountBelowZeroClampsToZero() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "crptState",
+                                    JSONObject().put("rndmAmount", -0.1)
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        assertEquals(0f, decoded.pages[0].grid616State.crptState.rndmAmount)
+    }
+
+    @Test
+    fun incompleteGrid616CrptSnapshotNormalizesTrackAndStepCounts() {
+        val jsonWithTooFew = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "crptState",
+                                    JSONObject()
+                                        .put(
+                                            "snapshot",
+                                            JSONObject().put(
+                                                "tracks",
+                                                JSONArray().put(
+                                                    JSONObject()
+                                                        .put("note", 48)
+                                                        .put("length", 16)
+                                                        .put("playbackMode", Grid616PlaybackMode.FORWARD.name)
+                                                        .put(
+                                                            "steps",
+                                                            JSONArray().put(
+                                                                JSONObject()
+                                                                    .put("enabled", true)
+                                                                    .put("velocity", 90)
+                                                                    .put("delayTicks", 2)
+                                                            )
+                                                        )
+                                                )
+                                            )
+                                        )
+                                )
+                        )
+                )
+            )
+
+        val jsonWithTooMany = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "crptState",
+                                    JSONObject()
+                                        .put(
+                                            "snapshot",
+                                            JSONObject().put(
+                                                "tracks",
+                                                JSONArray().apply {
+                                                    repeat(GRID_616_TRACK_COUNT + 2) {
+                                                        put(
+                                                            JSONObject()
+                                                                .put("note", 48 + it)
+                                                                .put("length", 8)
+                                                                .put("playbackMode", Grid616PlaybackMode.FORWARD.name)
+                                                                .put(
+                                                                    "steps",
+                                                                    JSONArray().apply {
+                                                                        repeat(GRID_616_MAX_STEPS + 3) { stepIndex ->
+                                                                            put(
+                                                                                JSONObject()
+                                                                                    .put("enabled", stepIndex % 2 == 0)
+                                                                                    .put("velocity", 80)
+                                                                                    .put("delayTicks", 1)
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                )
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                        )
+                                )
+                        )
+                )
+            )
+
+        val decodedFew = protoseqSessionStateFromJsonObject(jsonWithTooFew)
+        val decodedMany = protoseqSessionStateFromJsonObject(jsonWithTooMany)
+
+        val fewSnapshot = decodedFew.pages[0].grid616State.crptState.snapshot!!
+        val manySnapshot = decodedMany.pages[0].grid616State.crptState.snapshot!!
+
+        assertEquals(GRID_616_TRACK_COUNT, fewSnapshot.tracks.size)
+        assertTrue(fewSnapshot.tracks.all { it.steps.size == GRID_616_MAX_STEPS })
+        assertEquals(GRID_616_TRACK_COUNT, manySnapshot.tracks.size)
+        assertTrue(manySnapshot.tracks.all { it.steps.size == GRID_616_MAX_STEPS })
     }
 }
