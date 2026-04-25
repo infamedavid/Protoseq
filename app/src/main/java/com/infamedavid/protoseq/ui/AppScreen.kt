@@ -47,6 +47,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.session.ProtoseqSessionPresetSummary
+import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.session.ProtoseqSessionStore
 import com.infamedavid.protoseq.features.sequencer.SequencerType
 import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionState
@@ -317,7 +318,13 @@ fun AppScreen() {
                     }
                 },
                 onResetParameters = {
-                    updateCurrentTuringState { StochasticSequencerUiState() }
+                    sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                        when (page.selectedSequencerType) {
+                            SequencerType.TURING_MACHINE -> page.copy(turingState = StochasticSequencerUiState())
+                            SequencerType.GRID_616 -> page.copy(grid616State = Grid616SequencerUiState())
+                            SequencerType.EMPTY -> page
+                        }
+                    }
                 },
                 enabled = currentPage.enabled,
                 onToggleEnabled = {
@@ -474,6 +481,21 @@ fun AppScreen() {
                             .fillMaxWidth()
                             .padding(vertical = 12.dp)
                     )
+                }
+
+                SequencerType.GRID_616 -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "GRID 616 editor coming next.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -882,7 +904,7 @@ private fun SelectedSlotHeader(
 
         OutlinedButton(
             onClick = onResetParameters,
-            enabled = selectedSequencerType == SequencerType.TURING_MACHINE,
+            enabled = selectedSequencerType != SequencerType.EMPTY,
             modifier = Modifier.height(40.dp),
             shape = ProtoControlShape
         ) {

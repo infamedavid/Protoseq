@@ -5,4 +5,5 @@ enum class SequencerType(
 ) {
     EMPTY(label = "Empty"),
     TURING_MACHINE(label = "Turing Machine"),
+    GRID_616(label = "GRID 616"),
 }

@@ -1,5 +1,6 @@
 package com.infamedavid.protoseq.features.sequencer
 
+import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 
 data class SequencerPageState(
@@ -7,6 +8,7 @@ data class SequencerPageState(
     val enabled: Boolean = false,
     val selectedSequencerType: SequencerType = SequencerType.EMPTY,
     val turingState: StochasticSequencerUiState = StochasticSequencerUiState(),
+    val grid616State: Grid616SequencerUiState = Grid616SequencerUiState(),
 ) {
     fun isEmpty(): Boolean = selectedSequencerType == SequencerType.EMPTY
 
