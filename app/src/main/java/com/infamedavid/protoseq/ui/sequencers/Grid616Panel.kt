@@ -204,7 +204,6 @@ fun Grid616Panel(
             horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
         ) {
             Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
-            Spacer(modifier = Modifier.weight(1f))
             state.tracks.forEachIndexed { trackIndex, track ->
                 TrackBottomControls(
                     track = track,
@@ -425,12 +424,24 @@ private fun CompactChannelControl(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        Text(
-            text = "CHNL",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
         Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "CHNL",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = channel.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.secondary
+            )
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -444,25 +455,11 @@ private fun CompactChannelControl(
                 Text("-")
             }
 
-            Box(
+            Spacer(
                 modifier = Modifier
                     .weight(1f)
                     .height(34.dp)
-                    .clip(ProtoControlShape)
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-                    .border(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
-                        shape = ProtoControlShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = channel.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
+            )
 
             OutlinedButton(
                 onClick = onIncrement,
