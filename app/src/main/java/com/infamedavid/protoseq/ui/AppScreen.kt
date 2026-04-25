@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
+import com.infamedavid.protoseq.features.session.ProtoseqSessionPresetSummary
 import com.infamedavid.protoseq.features.session.ProtoseqSessionStore
 import com.infamedavid.protoseq.features.sequencer.SequencerType
 import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionState
@@ -95,7 +96,12 @@ fun AppScreen(
     var showQuantizationDialog by rememberSaveable { mutableStateOf(false) }
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
     var showRptrBasePickerDialog by rememberSaveable { mutableStateOf(false) }
+    var showSaveStateDialog by rememberSaveable { mutableStateOf(false) }
+    var showLoadStateDialog by rememberSaveable { mutableStateOf(false) }
+    var presetNameInput by rememberSaveable { mutableStateOf("") }
+    var saveDialogValidationMessage by rememberSaveable { mutableStateOf("") }
     var sessionStatusMessage by rememberSaveable { mutableStateOf("") }
+    var savedPresets by remember { mutableStateOf<List<ProtoseqSessionPresetSummary>>(emptyList()) }
     val sessionStore = remember(context) { ProtoseqSessionStore(context) }
     var sessionState by remember {
         mutableStateOf(
@@ -267,32 +273,26 @@ fun AppScreen(
                         label = "SAVE",
                         modifier = Modifier.weight(1f)
                     ) {
-                        val result = sessionStore.save(sessionState)
-                        sessionStatusMessage =
-                            if (result.isSuccess) "State saved" else "Could not save state"
+                        presetNameInput = ""
+                        saveDialogValidationMessage = ""
+                        showSaveStateDialog = true
                     }
 
                     ProtoButton(
                         label = "LOAD",
                         modifier = Modifier.weight(1f)
                     ) {
-                        if (!sessionStore.hasSavedState()) {
-                            sessionStatusMessage = "No saved state found"
-                            return@ProtoButton
-                        }
-
-                        transportViewModel.stop()
-
-                        sessionStore.load()
-                            .onSuccess { loadedState ->
-                                sessionState = loadedState
-                                showQuantizationDialog = false
-                                showRptrBasePickerDialog = false
-                                showBpmInputDialog = false
-                                sessionStatusMessage = "State loaded"
+                        sessionStore.listPresets()
+                            .onSuccess { presets ->
+                                savedPresets = presets
+                                if (presets.isEmpty()) {
+                                    sessionStatusMessage = "No saved presets found"
+                                } else {
+                                    showLoadStateDialog = true
+                                }
                             }
                             .onFailure {
-                                sessionStatusMessage = "Could not load state"
+                                sessionStatusMessage = "Could not load preset"
                             }
                     }
                 }
@@ -572,6 +572,116 @@ fun AppScreen(
                 confirmButton = {},
                 dismissButton = {
                     TextButton(onClick = { showQuantizationDialog = false }) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showSaveStateDialog) {
+            val isSaveNameValid = presetNameInput.trim().isNotBlank()
+            AlertDialog(
+                onDismissRequest = {
+                    showSaveStateDialog = false
+                    saveDialogValidationMessage = ""
+                },
+                title = { Text(text = "Save State") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = presetNameInput,
+                            onValueChange = { input ->
+                                presetNameInput = input
+                                if (saveDialogValidationMessage.isNotBlank()) {
+                                    saveDialogValidationMessage = ""
+                                }
+                            },
+                            singleLine = true,
+                            label = { Text("Preset name") }
+                        )
+                        if (saveDialogValidationMessage.isNotBlank()) {
+                            Text(
+                                text = saveDialogValidationMessage,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            val trimmedName = presetNameInput.trim()
+                            if (trimmedName.isBlank()) {
+                                saveDialogValidationMessage = "Name required"
+                                return@TextButton
+                            }
+                            sessionStore.savePreset(
+                                name = trimmedName,
+                                sessionState = sessionState
+                            )
+                                .onSuccess {
+                                    showSaveStateDialog = false
+                                    saveDialogValidationMessage = ""
+                                    sessionStatusMessage = "Preset saved"
+                                }
+                                .onFailure {
+                                    saveDialogValidationMessage = "Could not save preset"
+                                }
+                        },
+                        enabled = isSaveNameValid
+                    ) {
+                        Text("SAVE")
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = {
+                            showSaveStateDialog = false
+                            saveDialogValidationMessage = ""
+                        }
+                    ) {
+                        Text("Cancel")
+                    }
+                }
+            )
+        }
+
+        if (showLoadStateDialog) {
+            AlertDialog(
+                onDismissRequest = { showLoadStateDialog = false },
+                title = { Text(text = "Load State") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        savedPresets.forEach { preset ->
+                            TextButton(
+                                onClick = {
+                                    transportViewModel.stop()
+                                    sessionStore.loadPreset(preset.id)
+                                        .onSuccess { loadedState ->
+                                            sessionState = loadedState
+                                            showLoadStateDialog = false
+                                            showQuantizationDialog = false
+                                            showRptrBasePickerDialog = false
+                                            showBpmInputDialog = false
+                                            showSaveStateDialog = false
+                                            saveDialogValidationMessage = ""
+                                            sessionStatusMessage = "Preset loaded"
+                                        }
+                                        .onFailure {
+                                            sessionStatusMessage = "Could not load preset"
+                                        }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(text = preset.name)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                dismissButton = {
+                    TextButton(onClick = { showLoadStateDialog = false }) {
                         Text("Cancel")
                     }
                 }
