@@ -511,6 +511,7 @@ fun AppScreen(
                         Text(text = "ABOUT")
                     }
                 }
+            }
 
                 Spacer(modifier = Modifier.weight(1f))
 
