@@ -79,12 +79,19 @@ class Grid616SequencerUiStateTest {
     }
 
     @Test
-    fun defaultTracksUseExpectedDrumNotes() {
+    fun defaultTracksUseExpectedNotes() {
         val notes = defaultGrid616Tracks().map { it.note }
 
-        assertEquals(listOf(24, 26, 30, 34, 36, 38), notes)
+        assertEquals(listOf(48, 49, 50, 51, 44, 45), notes)
         assertEquals(GRID_616_TRACK_COUNT, notes.size)
         assertTrue(defaultGrid616Tracks().all { it.playbackMode == Grid616PlaybackMode.FORWARD })
         assertTrue(defaultGrid616Tracks().all { it.steps.size == GRID_616_MAX_STEPS })
+    }
+
+    @Test
+    fun defaultUiStateUsesDefaultTrackNotes() {
+        val notes = Grid616SequencerUiState().tracks.map { it.note }
+
+        assertEquals(listOf(48, 49, 50, 51, 44, 45), notes)
     }
 }

@@ -11,7 +11,7 @@ const val GRID_616_MAX_DELAY_TICKS = 23
 const val GRID_616_MIN_VELOCITY = 1
 const val GRID_616_MAX_VELOCITY = 127
 
-private val DEFAULT_GRID_616_TRACK_NOTES = listOf(24, 26, 30, 34, 36, 38)
+private val DEFAULT_GRID_616_TRACK_NOTES = listOf(48, 49, 50, 51, 44, 45)
 
 data class Grid616StepState(
     val enabled: Boolean = false,
