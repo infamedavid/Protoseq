@@ -193,6 +193,7 @@ class TransportViewModel(
                         sendRepeaterMidi(runtime.pageIndex, pauseResult.midi)
                         sendAndClearPendingNoteOffs(runtime)
                     }
+                    pauseAllGrid616RuntimesLocked()
                     syncRptrUiState()
                     clockEngine.pause()
                 }
@@ -607,6 +608,14 @@ class TransportViewModel(
     private fun clearAllGrid616RuntimesLocked() {
         val pageIndexes = grid616PageRuntimes.keys.toList()
         pageIndexes.forEach(::clearGrid616PageRuntimeLocked)
+    }
+
+    private fun pauseAllGrid616RuntimesLocked() {
+        grid616PageRuntimes.keys.toList().forEach { pageIndex ->
+            val runtime = grid616PageRuntimes[pageIndex] ?: return@forEach
+            clearGrid616ScheduledEvents(runtime)
+            releasePageNotesLocked(pageIndex)
+        }
     }
 
     private fun syncRptrUiState() {
