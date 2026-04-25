@@ -54,8 +54,8 @@ class ProtoseqSessionStateTest {
 
         assertEquals(10, state.midiChannel)
         assertEquals(0f, state.swingAmount)
-        assertEquals(Grid616PlaybackMode.FORWARD, state.playbackMode)
         assertEquals(GRID_616_TRACK_COUNT, state.tracks.size)
+        assertTrue(state.tracks.all { it.playbackMode == Grid616PlaybackMode.FORWARD })
         assertTrue(state.tracks.all { it.length == GRID_616_MAX_STEPS })
         assertTrue(state.tracks.all { it.steps.size == GRID_616_MAX_STEPS })
     }

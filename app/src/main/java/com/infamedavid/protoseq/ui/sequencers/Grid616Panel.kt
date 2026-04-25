@@ -57,23 +57,6 @@ fun Grid616Panel(
     onStateChange: (Grid616SequencerUiState) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val modes = remember {
-        listOf(
-            Grid616PlaybackMode.FORWARD,
-            Grid616PlaybackMode.REVERSE,
-            Grid616PlaybackMode.PING_PONG,
-            Grid616PlaybackMode.RANDOM,
-        )
-    }
-    val modeLabels = remember {
-        mapOf(
-            Grid616PlaybackMode.FORWARD to "FWD",
-            Grid616PlaybackMode.REVERSE to "REV",
-            Grid616PlaybackMode.PING_PONG to "PING",
-            Grid616PlaybackMode.RANDOM to "RND",
-        )
-    }
-
     var editingCell by remember { mutableStateOf<Grid616CellRef?>(null) }
     var velocityDraft by remember { mutableFloatStateOf(GRID_616_MIN_VELOCITY.toFloat()) }
     var delayDraft by remember { mutableFloatStateOf(0f) }
@@ -133,16 +116,6 @@ fun Grid616Panel(
                 )
             }
 
-            ProtoValueField(
-                label = "MODE",
-                value = modeLabels.getValue(state.playbackMode),
-                onClick = {
-                    val currentIndex = modes.indexOf(state.playbackMode).coerceAtLeast(0)
-                    val nextMode = modes[(currentIndex + 1) % modes.size]
-                    applyState(state.copy(playbackMode = nextMode))
-                },
-                modifier = Modifier.weight(1f)
-            )
         }
 
         Row(
@@ -165,6 +138,13 @@ fun Grid616Panel(
                     },
                     onToggleMute = {
                         applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
+                    },
+                    onCyclePlaybackMode = {
+                        applyState(
+                            state.updateTrack(trackIndex) { trackState ->
+                                trackState.copy(playbackMode = trackState.playbackMode.next())
+                            }
+                        )
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -393,6 +373,7 @@ private fun TrackHeader(
     onEditNote: () -> Unit,
     onEditLength: () -> Unit,
     onToggleMute: () -> Unit,
+    onCyclePlaybackMode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -412,6 +393,10 @@ private fun TrackHeader(
         CompactClickableField(
             text = "L${track.length}",
             onClick = onEditLength,
+        )
+        CompactClickableField(
+            text = track.playbackMode.shortLabel(),
+            onClick = onCyclePlaybackMode,
         )
         CompactClickableField(
             text = "M",
@@ -520,4 +505,18 @@ private fun Grid616TrackState.updateStep(
         if (index == stepIndex) transform(stepState) else stepState
     }
     return copy(steps = nextSteps)
+}
+
+private fun Grid616PlaybackMode.shortLabel(): String = when (this) {
+    Grid616PlaybackMode.FORWARD -> "FWD"
+    Grid616PlaybackMode.REVERSE -> "REV"
+    Grid616PlaybackMode.PING_PONG -> "PING"
+    Grid616PlaybackMode.RANDOM -> "RND"
+}
+
+private fun Grid616PlaybackMode.next(): Grid616PlaybackMode = when (this) {
+    Grid616PlaybackMode.FORWARD -> Grid616PlaybackMode.REVERSE
+    Grid616PlaybackMode.REVERSE -> Grid616PlaybackMode.PING_PONG
+    Grid616PlaybackMode.PING_PONG -> Grid616PlaybackMode.RANDOM
+    Grid616PlaybackMode.RANDOM -> Grid616PlaybackMode.FORWARD
 }

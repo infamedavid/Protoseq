@@ -223,12 +223,12 @@ class ProtoseqSessionStoreTest {
                 grid616State = page.grid616State.copy(
                     midiChannel = 16,
                     swingAmount = 0.5f,
-                    playbackMode = Grid616PlaybackMode.REVERSE,
                     tracks = page.grid616State.tracks.toMutableList().apply {
                         this[0] = this[0].copy(
                             note = 51,
                             muted = true,
                             length = 11,
+                            playbackMode = Grid616PlaybackMode.REVERSE,
                             steps = this[0].steps.toMutableList().apply {
                                 this[0] = Grid616StepState(
                                     enabled = true,
@@ -247,7 +247,8 @@ class ProtoseqSessionStoreTest {
 
         assertEquals(16, decodedGrid616.midiChannel)
         assertEquals(0.5f, decodedGrid616.swingAmount)
-        assertEquals(Grid616PlaybackMode.REVERSE, decodedGrid616.playbackMode)
+        assertEquals(Grid616PlaybackMode.REVERSE, decodedGrid616.tracks[0].playbackMode)
+        assertTrue(decodedGrid616.tracks.drop(1).all { it.playbackMode == Grid616PlaybackMode.FORWARD })
         assertEquals(51, decodedGrid616.tracks[0].note)
         assertTrue(decodedGrid616.tracks[0].muted)
         assertEquals(11, decodedGrid616.tracks[0].length)
@@ -277,7 +278,7 @@ class ProtoseqSessionStoreTest {
     }
 
     @Test
-    fun invalidGrid616PlaybackModeFallsBackToDefault() {
+    fun invalidTrackGrid616PlaybackModeFallsBackToDefault() {
         val json = JSONObject()
             .put("version", 1)
             .put("selectedPageIndex", 0)
@@ -290,14 +291,84 @@ class ProtoseqSessionStoreTest {
                         .put(
                             "grid616State",
                             JSONObject()
-                                .put("playbackMode", "NOPE")
+                                .put(
+                                    "tracks",
+                                    JSONArray().put(
+                                        JSONObject()
+                                            .put("note", 40)
+                                            .put("playbackMode", "NOPE")
+                                    )
+                                )
                         )
                 )
             )
 
         val decoded = protoseqSessionStateFromJsonObject(json)
 
-        assertEquals(Grid616PlaybackMode.FORWARD, decoded.pages[0].grid616State.playbackMode)
+        assertEquals(Grid616PlaybackMode.FORWARD, decoded.pages[0].grid616State.tracks[0].playbackMode)
+    }
+
+    @Test
+    fun missingTrackPlaybackModeFallsBackToLegacyGlobalPlaybackMode() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put("playbackMode", Grid616PlaybackMode.PING_PONG.name)
+                                .put(
+                                    "tracks",
+                                    JSONArray().put(
+                                        JSONObject()
+                                            .put("note", 36)
+                                            .put("length", 8)
+                                    )
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(Grid616PlaybackMode.PING_PONG, decoded.pages[0].grid616State.tracks[0].playbackMode)
+    }
+
+    @Test
+    fun missingTrackPlaybackModeFallsBackToForwardWhenNoLegacyModeExists() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("selectedSequencerType", SequencerType.GRID_616.name)
+                        .put(
+                            "grid616State",
+                            JSONObject()
+                                .put(
+                                    "tracks",
+                                    JSONArray().put(
+                                        JSONObject()
+                                            .put("note", 36)
+                                            .put("length", 8)
+                                    )
+                                )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(Grid616PlaybackMode.FORWARD, decoded.pages[0].grid616State.tracks[0].playbackMode)
     }
 
     @Test
