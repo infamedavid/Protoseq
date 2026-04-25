@@ -15,6 +15,14 @@ class Grid616SequencerUiStateTest {
     }
 
     @Test
+    fun stepNormalizationClampsDelayAboveMax() {
+        val normalized = Grid616StepState(delayTicks = 23).normalized()
+
+        assertEquals(GRID_616_MAX_DELAY_TICKS, normalized.delayTicks)
+        assertEquals(16, normalized.delayTicks)
+    }
+
+    @Test
     fun trackNormalizationClampsNoteAndLengthAndPadsSteps() {
         val normalized = Grid616TrackState(
             note = 200,
@@ -93,5 +101,10 @@ class Grid616SequencerUiStateTest {
         val notes = Grid616SequencerUiState().tracks.map { it.note }
 
         assertEquals(listOf(48, 49, 50, 51, 44, 45), notes)
+    }
+
+    @Test
+    fun maxFinalDelayTicksUsesStepAndGateBudget() {
+        assertEquals(20, GRID_616_MAX_FINAL_DELAY_TICKS)
     }
 }
