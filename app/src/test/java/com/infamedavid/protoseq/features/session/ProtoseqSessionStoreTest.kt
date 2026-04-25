@@ -47,6 +47,70 @@ class ProtoseqSessionStoreTest {
     }
 
     @Test
+    fun presetCollectionRoundTripPreservesEntries() {
+        val presets = listOf(
+            ProtoseqSessionPreset(
+                id = "preset-1",
+                name = "Test 1",
+                updatedAtMillis = 100L,
+                sessionState = ProtoseqSessionState(selectedPageIndex = 1)
+            ),
+            ProtoseqSessionPreset(
+                id = "preset-2",
+                name = "Test 2",
+                updatedAtMillis = 200L,
+                sessionState = ProtoseqSessionState(selectedPageIndex = 3)
+            )
+        )
+
+        val decoded = protoseqSessionPresetsFromJsonObject(
+            protoseqSessionPresetCollectionToJsonObject(presets)
+        )
+
+        assertEquals(2, decoded.size)
+        assertEquals("preset-1", decoded[0].id)
+        assertEquals("Test 2", decoded[1].name)
+        assertEquals(3, decoded[1].sessionState.selectedPageIndex)
+    }
+
+    @Test
+    fun savingSameNameOverwritesExistingPresetId() {
+        val original = listOf(
+            ProtoseqSessionPreset(
+                id = "same-id",
+                name = "Test 1",
+                updatedAtMillis = 100L,
+                sessionState = ProtoseqSessionState(selectedPageIndex = 0)
+            )
+        )
+
+        val updated = upsertSessionPreset(
+            presets = original,
+            name = "  test 1 ",
+            sessionState = ProtoseqSessionState(selectedPageIndex = 4),
+            nowMillis = 999L,
+            idGenerator = { "new-id" }
+        )
+
+        assertEquals(1, updated.size)
+        assertEquals("same-id", updated[0].id)
+        assertEquals("test 1", updated[0].name)
+        assertEquals(999L, updated[0].updatedAtMillis)
+        assertEquals(4, updated[0].sessionState.selectedPageIndex)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun blankPresetNameIsRejected() {
+        upsertSessionPreset(
+            presets = emptyList(),
+            name = "   ",
+            sessionState = ProtoseqSessionState(),
+            nowMillis = 123L,
+            idGenerator = { "id-1" }
+        )
+    }
+
+    @Test
     fun invalidEnumsFallBackToDefaults() {
         val json = JSONObject()
             .put("version", 1)
