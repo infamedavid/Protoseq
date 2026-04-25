@@ -128,7 +128,6 @@ fun Grid616Panel(
                         applyState(state.copy(swingAmount = value.coerceIn(0f, 0.75f)))
                     },
                     valueRange = 0f..0.75f,
-                    steps = 2,
                     modifier = Modifier.height(28.dp)
                 )
             }
