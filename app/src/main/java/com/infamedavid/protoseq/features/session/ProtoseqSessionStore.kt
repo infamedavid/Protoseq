@@ -5,6 +5,10 @@ import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
 import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
+import com.infamedavid.protoseq.features.grid616.Grid616CrptSnapshot
+import com.infamedavid.protoseq.features.grid616.Grid616CrptState
+import com.infamedavid.protoseq.features.grid616.Grid616CrptStepSnapshot
+import com.infamedavid.protoseq.features.grid616.Grid616CrptTrackSnapshot
 import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.PROTOSEQ_SESSION_STATE_VERSION
@@ -299,6 +303,7 @@ private fun stochasticSequencerUiStateFromJsonObject(
 private fun Grid616SequencerUiState.toJsonObject(): JSONObject = JSONObject()
     .put("midiChannel", midiChannel)
     .put("swingAmount", swingAmount)
+    .put("crptState", crptState.toJsonObject())
     .put(
         "tracks",
         JSONArray().apply {
@@ -323,6 +328,38 @@ private fun Grid616TrackState.toJsonObject(): JSONObject = JSONObject()
     )
 
 private fun Grid616StepState.toJsonObject(): JSONObject = JSONObject()
+    .put("enabled", enabled)
+    .put("velocity", velocity)
+    .put("delayTicks", delayTicks)
+
+private fun Grid616CrptState.toJsonObject(): JSONObject = JSONObject()
+    .put("rndmAmount", rndmAmount)
+    .put("snapshot", snapshot?.toJsonObject() ?: JSONObject.NULL)
+
+private fun Grid616CrptSnapshot.toJsonObject(): JSONObject = JSONObject()
+    .put(
+        "tracks",
+        JSONArray().apply {
+            tracks.forEach { track ->
+                put(track.toJsonObject())
+            }
+        }
+    )
+
+private fun Grid616CrptTrackSnapshot.toJsonObject(): JSONObject = JSONObject()
+    .put("note", note)
+    .put("length", length)
+    .put("playbackMode", playbackMode.name)
+    .put(
+        "steps",
+        JSONArray().apply {
+            steps.forEach { step ->
+                put(step.toJsonObject())
+            }
+        }
+    )
+
+private fun Grid616CrptStepSnapshot.toJsonObject(): JSONObject = JSONObject()
     .put("enabled", enabled)
     .put("velocity", velocity)
     .put("delayTicks", delayTicks)
@@ -357,6 +394,7 @@ private fun grid616SequencerUiStateFromJsonObject(
         midiChannel = json.optInt("midiChannel", defaultState.midiChannel),
         swingAmount = json.optDouble("swingAmount", defaultState.swingAmount.toDouble()).toFloat(),
         tracks = tracks,
+        crptState = grid616CrptStateFromJsonObject(json.optJSONObject("crptState"), defaultState.crptState),
     ).normalized()
 }
 
@@ -394,6 +432,70 @@ private fun grid616StepStateFromJsonObject(
     velocity = json.optInt("velocity", defaultState.velocity),
     delayTicks = json.optInt("delayTicks", defaultState.delayTicks),
 )
+
+private fun grid616CrptStateFromJsonObject(
+    json: JSONObject?,
+    defaultState: Grid616CrptState,
+): Grid616CrptState {
+    if (json == null) return defaultState
+
+    val snapshot = when {
+        !json.has("snapshot") -> defaultState.snapshot
+        json.isNull("snapshot") -> null
+        else -> grid616CrptSnapshotFromJsonObject(json.optJSONObject("snapshot"))
+    }
+
+    return defaultState.copy(
+        rndmAmount = json.optDouble("rndmAmount", defaultState.rndmAmount.toDouble()).toFloat(),
+        snapshot = snapshot,
+    ).normalized()
+}
+
+private fun grid616CrptSnapshotFromJsonObject(json: JSONObject?): Grid616CrptSnapshot? {
+    if (json == null) return null
+
+    val tracks = (json.optJSONArray("tracks") ?: JSONArray()).let { tracksJson ->
+        buildList {
+            for (i in 0 until tracksJson.length()) {
+                val trackJson = tracksJson.optJSONObject(i) ?: continue
+                add(grid616CrptTrackSnapshotFromJsonObject(trackJson))
+            }
+        }
+    }
+
+    return Grid616CrptSnapshot(tracks = tracks).normalized()
+}
+
+private fun grid616CrptTrackSnapshotFromJsonObject(
+    json: JSONObject,
+): Grid616CrptTrackSnapshot {
+    val steps = (json.optJSONArray("steps") ?: JSONArray()).let { stepsJson ->
+        buildList {
+            for (i in 0 until stepsJson.length()) {
+                val stepJson = stepsJson.optJSONObject(i) ?: continue
+                add(grid616CrptStepSnapshotFromJsonObject(stepJson))
+            }
+        }
+    }
+
+    return Grid616CrptTrackSnapshot(
+        note = json.optInt("note", Grid616TrackState(note = 24).note),
+        length = json.optInt("length", Grid616TrackState(note = 24).length),
+        playbackMode = enumValueOrDefault(
+            rawName = json.optString("playbackMode", Grid616PlaybackMode.FORWARD.name),
+            default = Grid616PlaybackMode.FORWARD,
+        ),
+        steps = steps,
+    ).normalized()
+}
+
+private fun grid616CrptStepSnapshotFromJsonObject(
+    json: JSONObject,
+): Grid616CrptStepSnapshot = Grid616CrptStepSnapshot(
+    enabled = json.optBoolean("enabled", false),
+    velocity = json.optInt("velocity", Grid616StepState().velocity),
+    delayTicks = json.optInt("delayTicks", Grid616StepState().delayTicks),
+).normalized()
 
 private inline fun <reified T : Enum<T>> enumValueOrDefault(rawName: String?, default: T): T {
     if (rawName.isNullOrBlank()) return default
