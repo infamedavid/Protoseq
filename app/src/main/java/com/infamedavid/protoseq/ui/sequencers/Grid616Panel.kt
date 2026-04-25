@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
@@ -45,6 +46,10 @@ import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.components.ProtoValueField
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
+
+private val Grid616StepCellSize = 12.dp
+private val Grid616StepGridGap = 2.dp
+private val Grid616StepNumberWidth = 22.dp
 
 @Composable
 fun Grid616Panel(
@@ -166,16 +171,16 @@ fun Grid616Panel(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
             repeat(GRID_616_MAX_STEPS) { stepIndex ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Grid616StepGridGap)
                 ) {
                     Text(
                         text = "%02d".format(stepIndex + 1),
-                        modifier = Modifier.width(34.dp),
+                        modifier = Modifier.width(Grid616StepNumberWidth),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.End
@@ -203,7 +208,7 @@ fun Grid616Panel(
                                 velocityDraft = step.velocity.toFloat()
                                 delayDraft = step.delayTicks.toFloat()
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.size(Grid616StepCellSize)
                         )
                     }
                 }
