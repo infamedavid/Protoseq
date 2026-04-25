@@ -243,6 +243,38 @@ fun Grid616Panel(
                 }
             }
         }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
+        ) {
+            Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
+            state.tracks.forEachIndexed { trackIndex, track ->
+                TrackBottomControls(
+                    track = track,
+                    modeMenuExpanded = editingTrackModeIndex == trackIndex,
+                    onOpenModeMenu = { editingTrackModeIndex = trackIndex },
+                    onDismissModeMenu = {
+                        if (editingTrackModeIndex == trackIndex) {
+                            editingTrackModeIndex = null
+                        }
+                    },
+                    onSelectPlaybackMode = { selectedMode ->
+                        applyState(
+                            state.updateTrack(trackIndex) { trackState ->
+                                trackState.copy(playbackMode = selectedMode)
+                            }
+                        )
+                        editingTrackModeIndex = null
+                    },
+                    onToggleMute = {
+                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
+                    },
+                    modifier = Modifier.width(Grid616TrackColumnWidth)
+                )
+            }
+        }
     }
 
     val openEditor = editingCell
