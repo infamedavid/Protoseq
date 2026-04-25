@@ -245,17 +245,9 @@ class TransportViewModel(
                 }
 
                 nextConfigsByPage.forEach { (pageIndex, nextConfig) ->
-                    val previousConfig = activeGrid616PageConfigs[pageIndex]
-                    if (previousConfig != nextConfig) {
-                        clearGrid616PageRuntimeLocked(pageIndex)
-                        grid616PageRuntimes[pageIndex] = Grid616PageRuntime(pageIndex = pageIndex)
-                    } else {
-                        grid616PageRuntimes.getOrPut(pageIndex) { Grid616PageRuntime(pageIndex = pageIndex) }
-                    }
+                    activeGrid616PageConfigs[pageIndex] = nextConfig
+                    grid616PageRuntimes.getOrPut(pageIndex) { Grid616PageRuntime(pageIndex = pageIndex) }
                 }
-
-                activeGrid616PageConfigs.clear()
-                activeGrid616PageConfigs.putAll(nextConfigsByPage)
             }
         }
     }
