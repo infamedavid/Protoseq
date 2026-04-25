@@ -492,7 +492,7 @@ private fun CrptControls(
             onValueChange = onRndmChange,
             valueRange = 0f..1f,
             modifier = Modifier
-                .requiredWidth(150.dp)
+                .requiredWidth(195.dp)
                 .height(28.dp)
         )
 
