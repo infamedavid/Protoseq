@@ -54,12 +54,12 @@ import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 private val Grid616StepCellSize = 20.dp
 private val Grid616GridSpacing = 4.dp
 private val Grid616StepNumberWidth = 34.dp
-private val Grid616TrackControlWidth = 40.dp
-private val Grid616TrackColumnWidth = 36.dp
+private val Grid616TrackControlWidth = 44.dp
+private val Grid616TrackColumnWidth = 44.dp
 private val Grid616TrackColumnSpacing = 4.dp
 private val Grid616TrackBlockWidth =
     (Grid616TrackColumnWidth * GRID_616_TRACK_COUNT) +
-        (Grid616TrackColumnSpacing * (GRID_616_TRACK_COUNT - 1))
+            (Grid616TrackColumnSpacing * (GRID_616_TRACK_COUNT - 1))
 
 @Composable
 fun Grid616Panel(
@@ -136,11 +136,9 @@ fun Grid616Panel(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.Top
         ) {
-            Spacer(modifier = Modifier.weight(1f))
-
             Column(
                 modifier = Modifier.width(Grid616StepNumberWidth + Grid616GridSpacing + Grid616TrackBlockWidth),
                 verticalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
@@ -241,38 +239,6 @@ fun Grid616Panel(
                         )
                     }
                 }
-            }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
-        ) {
-            Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
-            state.tracks.forEachIndexed { trackIndex, track ->
-                TrackBottomControls(
-                    track = track,
-                    modeMenuExpanded = editingTrackModeIndex == trackIndex,
-                    onOpenModeMenu = { editingTrackModeIndex = trackIndex },
-                    onDismissModeMenu = {
-                        if (editingTrackModeIndex == trackIndex) {
-                            editingTrackModeIndex = null
-                        }
-                    },
-                    onSelectPlaybackMode = { selectedMode ->
-                        applyState(
-                            state.updateTrack(trackIndex) { trackState ->
-                                trackState.copy(playbackMode = selectedMode)
-                            }
-                        )
-                        editingTrackModeIndex = null
-                    },
-                    onToggleMute = {
-                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
-                    },
-                    modifier = Modifier.width(Grid616TrackColumnWidth)
-                )
             }
         }
     }
