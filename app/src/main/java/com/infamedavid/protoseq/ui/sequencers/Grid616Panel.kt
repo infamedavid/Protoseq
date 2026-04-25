@@ -48,7 +48,9 @@ import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
+import com.infamedavid.protoseq.features.grid616.applyCrptSnapshotWithMutation
 import com.infamedavid.protoseq.features.grid616.normalized
+import com.infamedavid.protoseq.features.grid616.toCrptSnapshot
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 
@@ -247,11 +249,26 @@ fun Grid616Panel(
                 hasSnapshot = state.crptState.snapshot != null,
                 rndmAmount = state.crptState.rndmAmount,
                 onSave = {
-                    applyState(state.withSavedCrptSnapshot())
+                    applyState(
+                        state.copy(
+                            crptState = state.crptState.copy(
+                                snapshot = state.toCrptSnapshot()
+                            )
+                        ).normalized()
+                    )
                 },
                 onSet = {
-                    if (state.crptState.snapshot == null) return@CrptControls
-                    applyState(state.withAppliedCrptSnapshot())
+                    val snapshot = state.crptState.snapshot
+                    applyState(
+                        if (snapshot != null) {
+                            state.applyCrptSnapshotWithMutation(
+                                snapshot = snapshot,
+                                rndmAmount = state.crptState.rndmAmount
+                            ).normalized()
+                        } else {
+                            state
+                        }
+                    )
                 },
                 onRndmChange = { value ->
                     applyState(
