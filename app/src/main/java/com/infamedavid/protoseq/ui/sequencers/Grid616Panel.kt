@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
@@ -50,6 +52,7 @@ import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
 private val Grid616StepCellSize = 20.dp
 private val Grid616GridSpacing = 4.dp
 private val Grid616StepNumberWidth = 34.dp
+private val Grid616TrackControlWidth = 40.dp
 
 @Composable
 fun Grid616Panel(
@@ -64,6 +67,7 @@ fun Grid616Panel(
     var noteDraft by remember { mutableStateOf(60) }
     var editingTrackLengthIndex by remember { mutableStateOf<Int?>(null) }
     var lengthDraft by remember { mutableStateOf(GRID_616_MAX_STEPS) }
+    var editingTrackModeIndex by remember { mutableStateOf<Int?>(null) }
 
     fun applyState(nextState: Grid616SequencerUiState) {
         onStateChange(nextState.normalized())
@@ -125,7 +129,7 @@ fun Grid616Panel(
         ) {
             Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
             state.tracks.forEachIndexed { trackIndex, track ->
-                TrackHeader(
+                TrackTopControls(
                     trackIndex = trackIndex,
                     track = track,
                     onEditNote = {
@@ -135,16 +139,6 @@ fun Grid616Panel(
                     onEditLength = {
                         editingTrackLengthIndex = trackIndex
                         lengthDraft = track.length
-                    },
-                    onToggleMute = {
-                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
-                    },
-                    onCyclePlaybackMode = {
-                        applyState(
-                            state.updateTrack(trackIndex) { trackState ->
-                                trackState.copy(playbackMode = trackState.playbackMode.next())
-                            }
-                        )
                     },
                     modifier = Modifier.weight(1f)
                 )
@@ -192,6 +186,38 @@ fun Grid616Panel(
                         )
                     }
                 }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
+        ) {
+            Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
+            state.tracks.forEachIndexed { trackIndex, track ->
+                TrackBottomControls(
+                    track = track,
+                    modeMenuExpanded = editingTrackModeIndex == trackIndex,
+                    onOpenModeMenu = { editingTrackModeIndex = trackIndex },
+                    onDismissModeMenu = {
+                        if (editingTrackModeIndex == trackIndex) {
+                            editingTrackModeIndex = null
+                        }
+                    },
+                    onSelectPlaybackMode = { selectedMode ->
+                        applyState(
+                            state.updateTrack(trackIndex) { trackState ->
+                                trackState.copy(playbackMode = selectedMode)
+                            }
+                        )
+                        editingTrackModeIndex = null
+                    },
+                    onToggleMute = {
+                        applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
+                    },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
@@ -278,16 +304,28 @@ fun Grid616Panel(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         OutlinedButton(
+                            onClick = { noteDraft = (noteDraft - 12).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("-12")
+                        }
+                        OutlinedButton(
                             onClick = { noteDraft = (noteDraft - 1).coerceIn(0, 127) },
                             shape = ProtoControlShape
                         ) {
-                            Text("-")
+                            Text("-1")
                         }
                         OutlinedButton(
                             onClick = { noteDraft = (noteDraft + 1).coerceIn(0, 127) },
                             shape = ProtoControlShape
                         ) {
-                            Text("+")
+                            Text("+1")
+                        }
+                        OutlinedButton(
+                            onClick = { noteDraft = (noteDraft + 12).coerceIn(0, 127) },
+                            shape = ProtoControlShape
+                        ) {
+                            Text("+12")
                         }
                     }
                 }
@@ -367,13 +405,11 @@ fun Grid616Panel(
 }
 
 @Composable
-private fun TrackHeader(
+private fun TrackTopControls(
     trackIndex: Int,
     track: Grid616TrackState,
     onEditNote: () -> Unit,
     onEditLength: () -> Unit,
-    onToggleMute: () -> Unit,
-    onCyclePlaybackMode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -394,10 +430,41 @@ private fun TrackHeader(
             text = "L${track.length}",
             onClick = onEditLength,
         )
-        CompactClickableField(
-            text = track.playbackMode.shortLabel(),
-            onClick = onCyclePlaybackMode,
-        )
+    }
+}
+
+@Composable
+private fun TrackBottomControls(
+    track: Grid616TrackState,
+    modeMenuExpanded: Boolean,
+    onOpenModeMenu: () -> Unit,
+    onDismissModeMenu: () -> Unit,
+    onSelectPlaybackMode: (Grid616PlaybackMode) -> Unit,
+    onToggleMute: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Box {
+            CompactClickableField(
+                text = track.playbackMode.shortLabel(),
+                onClick = onOpenModeMenu,
+            )
+            DropdownMenu(
+                expanded = modeMenuExpanded,
+                onDismissRequest = onDismissModeMenu
+            ) {
+                Grid616PlaybackMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(mode.shortLabel()) },
+                        onClick = { onSelectPlaybackMode(mode) }
+                    )
+                }
+            }
+        }
         CompactClickableField(
             text = "M",
             onClick = onToggleMute,
@@ -425,7 +492,7 @@ private fun CompactClickableField(
 
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(Grid616TrackControlWidth)
             .clip(ProtoControlShape)
             .background(background)
             .border(width = 1.dp, color = border, shape = ProtoControlShape)
@@ -510,13 +577,6 @@ private fun Grid616TrackState.updateStep(
 private fun Grid616PlaybackMode.shortLabel(): String = when (this) {
     Grid616PlaybackMode.FORWARD -> "FWD"
     Grid616PlaybackMode.REVERSE -> "REV"
-    Grid616PlaybackMode.PING_PONG -> "PING"
+    Grid616PlaybackMode.PING_PONG -> "PNG"
     Grid616PlaybackMode.RANDOM -> "RND"
-}
-
-private fun Grid616PlaybackMode.next(): Grid616PlaybackMode = when (this) {
-    Grid616PlaybackMode.FORWARD -> Grid616PlaybackMode.REVERSE
-    Grid616PlaybackMode.REVERSE -> Grid616PlaybackMode.PING_PONG
-    Grid616PlaybackMode.PING_PONG -> Grid616PlaybackMode.RANDOM
-    Grid616PlaybackMode.RANDOM -> Grid616PlaybackMode.FORWARD
 }
