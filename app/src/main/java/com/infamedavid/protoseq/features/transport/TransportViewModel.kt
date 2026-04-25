@@ -333,23 +333,27 @@ class TransportViewModel(
             if (!isGrid616StepTick(currentTick) || runtime.lastProcessedStepTick == currentTick) return@forEach
 
             runtime.lastProcessedStepTick = currentTick
-            val swingDelayTicks = if (runtime.globalStepCounter % 2L == 1L) {
-                (config.swingAmount * 12f).roundToInt()
-            } else {
-                0
-            }.coerceIn(0, GRID_616_MAX_DELAY_TICKS)
+            val isSwungStep = runtime.globalStepCounter % 2L == 1L
+            val swingDepth = (config.swingAmount / GRID_616_MAX_SWING_AMOUNT).coerceIn(0f, 1f)
 
-            config.tracks.forEach { track ->
-                if (track.muted) return@forEach
+            config.tracks.forEachIndexed { trackIndex, track ->
+                if (track.muted) return@forEachIndexed
                 val stepIndex = resolveGrid616StepIndex(
                     globalStepCounter = runtime.globalStepCounter,
                     length = track.length,
                     playbackMode = track.playbackMode,
                     randomIndexProvider = { length -> Random.nextInt(until = length) }
                 )
-                val step = track.steps.getOrNull(stepIndex) ?: return@forEach
-                if (!step.enabled) return@forEach
+                val step = track.steps.getOrNull(stepIndex) ?: return@forEachIndexed
+                if (!step.enabled) return@forEachIndexed
 
+                val trackMaxSwingTicks = GRID_616_TRACK_MAX_SWING_DELAY_TICKS
+                    .getOrElse(trackIndex) { GRID_616_TRACK_MAX_SWING_DELAY_TICKS.last() }
+                val swingDelayTicks = if (isSwungStep) {
+                    (trackMaxSwingTicks * swingDepth).roundToInt()
+                } else {
+                    0
+                }
                 val finalDelayTicks = (swingDelayTicks + step.delayTicks).coerceIn(0, GRID_616_MAX_DELAY_TICKS)
                 val dueTick = currentTick + finalDelayTicks
                 val trigger = Grid616ScheduledTrigger(
@@ -662,6 +666,8 @@ class TransportViewModel(
         private const val TICKS_PER_STEP = 24L
         private const val MIDI_MIN = 0
         private const val MIDI_MAX = 127
+        private const val GRID_616_MAX_SWING_AMOUNT = 0.75f
+        private val GRID_616_TRACK_MAX_SWING_DELAY_TICKS = listOf(3, 2, 4, 3, 2, 4)
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
