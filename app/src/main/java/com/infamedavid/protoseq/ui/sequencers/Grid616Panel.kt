@@ -135,6 +135,7 @@ fun Grid616Panel(
             horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
         ) {
             Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
+            Spacer(modifier = Modifier.weight(1f))
             state.tracks.forEachIndexed { trackIndex, track ->
                 TrackTopControls(
                     trackIndex = trackIndex,
@@ -167,6 +168,7 @@ fun Grid616Panel(
                         textAlign = TextAlign.End
                     )
 
+                    Spacer(modifier = Modifier.weight(1f))
                     state.tracks.forEachIndexed { trackIndex, track ->
                         val step = track.steps[stepIndex]
                         val editable = stepIndex < track.length
