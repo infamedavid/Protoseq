@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
+import com.infamedavid.protoseq.features.session.ProtoseqSessionStore
 import com.infamedavid.protoseq.features.sequencer.SequencerType
 import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionState
 import com.infamedavid.protoseq.features.sequencer.currentPage
@@ -94,6 +95,8 @@ fun AppScreen(
     var showQuantizationDialog by rememberSaveable { mutableStateOf(false) }
     var showAboutDialog by rememberSaveable { mutableStateOf(false) }
     var showRptrBasePickerDialog by rememberSaveable { mutableStateOf(false) }
+    var sessionStatusMessage by rememberSaveable { mutableStateOf("") }
+    val sessionStore = remember(context) { ProtoseqSessionStore(context) }
     var sessionState by remember {
         mutableStateOf(
             createDefaultProtoseqSessionState().updatePage(pageIndex = 0) { page ->
@@ -254,6 +257,52 @@ fun AppScreen(
                             }
                         }
                     }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    ProtoButton(
+                        label = "SAVE",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        val result = sessionStore.save(sessionState)
+                        sessionStatusMessage =
+                            if (result.isSuccess) "State saved" else "Could not save state"
+                    }
+
+                    ProtoButton(
+                        label = "LOAD",
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        if (!sessionStore.hasSavedState()) {
+                            sessionStatusMessage = "No saved state found"
+                            return@ProtoButton
+                        }
+
+                        transportViewModel.stop()
+
+                        sessionStore.load()
+                            .onSuccess { loadedState ->
+                                sessionState = loadedState
+                                showQuantizationDialog = false
+                                showRptrBasePickerDialog = false
+                                showBpmInputDialog = false
+                                sessionStatusMessage = "State loaded"
+                            }
+                            .onFailure {
+                                sessionStatusMessage = "Could not load state"
+                            }
+                    }
+                }
+
+                if (sessionStatusMessage.isNotBlank()) {
+                    Text(
+                        text = sessionStatusMessage,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
