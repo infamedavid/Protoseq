@@ -42,6 +42,7 @@ import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_TRACK_LENGTH
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_VELOCITY
 import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_TRACK_LENGTH
 import com.infamedavid.protoseq.features.grid616.GRID_616_MIN_VELOCITY
+import com.infamedavid.protoseq.features.grid616.GRID_616_TRACK_COUNT
 import com.infamedavid.protoseq.features.grid616.Grid616PlaybackMode
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
@@ -55,6 +56,10 @@ private val Grid616GridSpacing = 4.dp
 private val Grid616StepNumberWidth = 34.dp
 private val Grid616TrackControlWidth = 40.dp
 private val Grid616TrackColumnWidth = 36.dp
+private val Grid616TrackColumnSpacing = 4.dp
+private val Grid616TrackBlockWidth =
+    (Grid616TrackColumnWidth * GRID_616_TRACK_COUNT) +
+        (Grid616TrackColumnSpacing * (GRID_616_TRACK_COUNT - 1))
 
 @Composable
 fun Grid616Panel(
@@ -131,65 +136,106 @@ fun Grid616Panel(
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top,
-            horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
+            horizontalArrangement = Arrangement.spacedBy(0.dp),
+            verticalAlignment = Alignment.Top
         ) {
-            Spacer(modifier = Modifier.width(Grid616StepNumberWidth))
             Spacer(modifier = Modifier.weight(1f))
-            state.tracks.forEachIndexed { trackIndex, track ->
-                TrackTopControls(
-                    trackIndex = trackIndex,
-                    track = track,
-                    onEditNote = {
-                        editingTrackNoteIndex = trackIndex
-                        noteDraft = track.note
-                    },
-                    onEditLength = {
-                        editingTrackLengthIndex = trackIndex
-                        lengthDraft = track.length
-                    },
-                    modifier = Modifier.width(Grid616TrackColumnWidth)
-                )
-            }
-        }
 
-        Column(verticalArrangement = Arrangement.spacedBy(Grid616GridSpacing)) {
-            repeat(GRID_616_MAX_STEPS) { stepIndex ->
+            Column(
+                modifier = Modifier.width(Grid616StepNumberWidth + Grid616GridSpacing + Grid616TrackBlockWidth),
+                verticalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Grid616GridSpacing)
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(Grid616TrackColumnSpacing)
                 ) {
-                    Text(
-                        text = "%02d".format(stepIndex + 1),
-                        modifier = Modifier.width(Grid616StepNumberWidth),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.End
-                    )
-
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.width(Grid616StepNumberWidth + Grid616GridSpacing))
                     state.tracks.forEachIndexed { trackIndex, track ->
-                        val step = track.steps[stepIndex]
-                        val editable = stepIndex < track.length
-                        StepCell(
-                            enabled = step.enabled,
-                            editable = editable,
-                            onClick = {
-                                if (!editable) return@StepCell
+                        TrackTopControls(
+                            trackIndex = trackIndex,
+                            track = track,
+                            onEditNote = {
+                                editingTrackNoteIndex = trackIndex
+                                noteDraft = track.note
+                            },
+                            onEditLength = {
+                                editingTrackLengthIndex = trackIndex
+                                lengthDraft = track.length
+                            },
+                            modifier = Modifier.width(Grid616TrackColumnWidth)
+                        )
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(Grid616GridSpacing)) {
+                    repeat(GRID_616_MAX_STEPS) { stepIndex ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "%02d".format(stepIndex + 1),
+                                modifier = Modifier.width(Grid616StepNumberWidth),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.End
+                            )
+                            Spacer(modifier = Modifier.width(Grid616GridSpacing))
+                            Row(horizontalArrangement = Arrangement.spacedBy(Grid616TrackColumnSpacing)) {
+                                state.tracks.forEachIndexed { trackIndex, track ->
+                                    val step = track.steps[stepIndex]
+                                    val editable = stepIndex < track.length
+                                    StepCell(
+                                        enabled = step.enabled,
+                                        editable = editable,
+                                        onClick = {
+                                            if (!editable) return@StepCell
+                                            applyState(
+                                                state.updateTrack(trackIndex) { trackState ->
+                                                    trackState.updateStep(stepIndex) { cell ->
+                                                        cell.copy(enabled = !cell.enabled)
+                                                    }
+                                                }
+                                            )
+                                        },
+                                        onLongPress = {
+                                            if (!editable) return@StepCell
+                                            editingCell = Grid616CellRef(trackIndex = trackIndex, stepIndex = stepIndex)
+                                            velocityDraft = step.velocity.toFloat()
+                                            delayDraft = step.delayTicks.toFloat()
+                                        },
+                                        modifier = Modifier.width(Grid616TrackColumnWidth)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(Grid616TrackColumnSpacing)
+                ) {
+                    Spacer(modifier = Modifier.width(Grid616StepNumberWidth + Grid616GridSpacing))
+                    state.tracks.forEachIndexed { trackIndex, track ->
+                        TrackBottomControls(
+                            track = track,
+                            modeMenuExpanded = editingTrackModeIndex == trackIndex,
+                            onOpenModeMenu = { editingTrackModeIndex = trackIndex },
+                            onDismissModeMenu = {
+                                if (editingTrackModeIndex == trackIndex) {
+                                    editingTrackModeIndex = null
+                                }
+                            },
+                            onSelectPlaybackMode = { selectedMode ->
                                 applyState(
                                     state.updateTrack(trackIndex) { trackState ->
-                                        trackState.updateStep(stepIndex) { cell ->
-                                            cell.copy(enabled = !cell.enabled)
-                                        }
+                                        trackState.copy(playbackMode = selectedMode)
                                     }
                                 )
+                                editingTrackModeIndex = null
                             },
-                            onLongPress = {
-                                if (!editable) return@StepCell
-                                editingCell = Grid616CellRef(trackIndex = trackIndex, stepIndex = stepIndex)
-                                velocityDraft = step.velocity.toFloat()
-                                delayDraft = step.delayTicks.toFloat()
+                            onToggleMute = {
+                                applyState(state.updateTrack(trackIndex) { it.copy(muted = !it.muted) })
                             },
                             modifier = Modifier.width(Grid616TrackColumnWidth)
                         )
