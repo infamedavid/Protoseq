@@ -76,6 +76,22 @@ class ProtoseqSessionStoreTest {
     }
 
     @Test
+    fun sessionRoundTripPreservesGinasArpSequencerType() {
+        val input = ProtoseqSessionState()
+            .updatePage(0) { page ->
+                page.copy(
+                    selectedSequencerType = SequencerType.GINAS_ARP,
+                    enabled = true,
+                )
+            }
+
+        val decoded = protoseqSessionStateFromJsonObject(input.toJsonObject())
+
+        assertEquals(SequencerType.GINAS_ARP, decoded.pages[0].selectedSequencerType)
+        assertTrue(decoded.pages[0].enabled)
+    }
+
+    @Test
     fun presetCollectionRoundTripPreservesEntries() {
         val presets = listOf(
             ProtoseqSessionPreset(
