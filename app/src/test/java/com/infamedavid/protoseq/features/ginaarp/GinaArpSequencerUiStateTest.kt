@@ -18,6 +18,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(GinaArpMode.MAJOR, state.mode)
         assertEquals(GinaArpPlayMode.FORWARD, state.playMode)
         assertEquals(1, state.tempoDivisor)
+        assertEquals(3, state.midiChannel)
         assertEquals(0.5f, state.gateLength)
         assertEquals(0f, state.randomGateLength)
         assertEquals(1f, state.bernoulliGate)
@@ -67,6 +68,7 @@ class GinaArpSequencerUiStateTest {
             globalRatioMultiplier = -2f,
             globalNoteOffset = -99,
             tempoDivisor = 0,
+            midiChannel = 0,
             gateLength = -0.2f,
             randomGateLength = -0.3f,
             bernoulliGate = -0.4f,
@@ -77,6 +79,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(-1f, low.globalRatioMultiplier)
         assertEquals(-12, low.globalNoteOffset)
         assertEquals(1, low.tempoDivisor)
+        assertEquals(1, low.midiChannel)
         assertEquals(0f, low.gateLength)
         assertEquals(0f, low.randomGateLength)
         assertEquals(0f, low.bernoulliGate)
@@ -87,6 +90,7 @@ class GinaArpSequencerUiStateTest {
             globalRatioMultiplier = 2f,
             globalNoteOffset = 99,
             tempoDivisor = 9,
+            midiChannel = 17,
             gateLength = 1.2f,
             randomGateLength = 1.3f,
             bernoulliGate = 1.4f,
@@ -97,6 +101,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(1f, high.globalRatioMultiplier)
         assertEquals(12, high.globalNoteOffset)
         assertEquals(8, high.tempoDivisor)
+        assertEquals(16, high.midiChannel)
         assertEquals(1f, high.gateLength)
         assertEquals(1f, high.randomGateLength)
         assertEquals(1f, high.bernoulliGate)

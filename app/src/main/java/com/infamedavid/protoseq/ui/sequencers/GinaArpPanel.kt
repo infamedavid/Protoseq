@@ -30,11 +30,13 @@ import androidx.compose.ui.unit.dp
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_OCTAVE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_ARP_LENGTH
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_OCTAVE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_ARP_LENGTH
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MUTABLE_SEED
@@ -221,6 +223,22 @@ private fun GlobalControls(
             value = state.tempoDivisor.toString(),
             onDecrement = { onStateChange(state.copy(tempoDivisor = state.tempoDivisor - 1)) },
             onIncrement = { onStateChange(state.copy(tempoDivisor = state.tempoDivisor + 1)) },
+            modifier = Modifier.weight(1f)
+        )
+
+        ProtoValueField(
+            label = "CHNL",
+            value = state.midiChannel.toString(),
+            onDecrement = {
+                onStateChange(
+                    state.copy(midiChannel = (state.midiChannel - 1).coerceAtLeast(GINA_ARP_MIN_MIDI_CHANNEL))
+                )
+            },
+            onIncrement = {
+                onStateChange(
+                    state.copy(midiChannel = (state.midiChannel + 1).coerceAtMost(GINA_ARP_MAX_MIDI_CHANNEL))
+                )
+            },
             modifier = Modifier.weight(1f)
         )
     }

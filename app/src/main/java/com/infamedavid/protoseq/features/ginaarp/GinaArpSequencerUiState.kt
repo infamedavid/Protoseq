@@ -22,6 +22,10 @@ const val GINA_ARP_MAX_NOTE_OFFSET = 12
 const val GINA_ARP_MIN_TEMPO_DIVISOR = 1
 const val GINA_ARP_MAX_TEMPO_DIVISOR = 8
 
+const val GINA_ARP_MIN_MIDI_CHANNEL = 1
+const val GINA_ARP_MAX_MIDI_CHANNEL = 16
+const val GINA_ARP_DEFAULT_MIDI_CHANNEL = 3
+
 const val GINA_ARP_MIN_OCTAVE = 0
 const val GINA_ARP_MAX_OCTAVE = 8
 
@@ -75,6 +79,7 @@ data class GinaArpSequencerUiState(
     val globalRatioMultiplier: Float = 1f,
     val globalNoteOffset: Int = 0,
     val tempoDivisor: Int = GINA_ARP_MIN_TEMPO_DIVISOR,
+    val midiChannel: Int = GINA_ARP_DEFAULT_MIDI_CHANNEL,
     val gateLength: Float = 0.5f,
     val randomGateLength: Float = 0f,
     val bernoulliGate: Float = 1f,
@@ -98,6 +103,7 @@ fun GinaArpSequencerUiState.normalized(): GinaArpSequencerUiState {
         globalRatioMultiplier = globalRatioMultiplier.coerceIn(-1f, 1f),
         globalNoteOffset = globalNoteOffset.coerceIn(GINA_ARP_MIN_NOTE_OFFSET, GINA_ARP_MAX_NOTE_OFFSET),
         tempoDivisor = tempoDivisor.coerceIn(GINA_ARP_MIN_TEMPO_DIVISOR, GINA_ARP_MAX_TEMPO_DIVISOR),
+        midiChannel = midiChannel.coerceIn(GINA_ARP_MIN_MIDI_CHANNEL, GINA_ARP_MAX_MIDI_CHANNEL),
         gateLength = gateLength.coerceIn(0f, 1f),
         randomGateLength = randomGateLength.coerceIn(0f, 1f),
         bernoulliGate = bernoulliGate.coerceIn(0f, 1f),

@@ -394,6 +394,7 @@ private fun GinaArpSequencerUiState.toJsonObject(): JSONObject = JSONObject()
     .put("globalRatioMultiplier", globalRatioMultiplier)
     .put("globalNoteOffset", globalNoteOffset)
     .put("tempoDivisor", tempoDivisor)
+    .put("midiChannel", midiChannel)
     .put("gateLength", gateLength)
     .put("randomGateLength", randomGateLength)
     .put("bernoulliGate", bernoulliGate)
@@ -607,6 +608,7 @@ private fun ginaArpStateFromJsonObject(
             .toFloat(),
         globalNoteOffset = json.optInt("globalNoteOffset", defaultState.globalNoteOffset),
         tempoDivisor = json.optInt("tempoDivisor", defaultState.tempoDivisor),
+        midiChannel = json.optInt("midiChannel", defaultState.midiChannel),
         gateLength = json.optDouble("gateLength", defaultState.gateLength.toDouble()).toFloat(),
         randomGateLength = json
             .optDouble("randomGateLength", defaultState.randomGateLength.toDouble())
