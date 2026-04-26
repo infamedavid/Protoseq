@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -74,6 +73,9 @@ private fun GinaArpPlayMode.shortLabel(): String = when (this) {
 private fun formatSeedLabel(seed: Int): String =
     if (seed == GINA_ARP_MUTABLE_SEED) "MTB" else "%03d".format(seed)
 
+private fun formatOffsetLabel(offset: Int): String =
+    if (offset > 0) "+$offset" else offset.toString()
+
 @Composable
 fun GinaArpPanel(
     state: GinaArpSequencerUiState,
@@ -135,11 +137,28 @@ private fun GlobalControls(
     var playModeMenuExpanded by remember { mutableStateOf(false) }
     var seedMenuExpanded by remember { mutableStateOf(false) }
     var divisorMenuExpanded by remember { mutableStateOf(false) }
+    var offsetMenuExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
+        ProtoValueField(
+            label = "CHNL",
+            value = state.midiChannel.toString(),
+            onDecrement = {
+                onStateChange(
+                    state.copy(midiChannel = (state.midiChannel - 1).coerceAtLeast(GINA_ARP_MIN_MIDI_CHANNEL))
+                )
+            },
+            onIncrement = {
+                onStateChange(
+                    state.copy(midiChannel = (state.midiChannel + 1).coerceAtMost(GINA_ARP_MAX_MIDI_CHANNEL))
+                )
+            },
+            modifier = Modifier.weight(1f)
+        )
+
         ProtoValueField(
             label = "LENG",
             value = state.sequenceLength.toString(),
@@ -152,6 +171,56 @@ private fun GlobalControls(
             modifier = Modifier.weight(1f)
         )
 
+        Box(modifier = Modifier.weight(1f)) {
+            ProtoValueField(
+                label = "PLAY",
+                value = state.playMode.shortLabel(),
+                onClick = { playModeMenuExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = playModeMenuExpanded,
+                onDismissRequest = { playModeMenuExpanded = false }
+            ) {
+                GinaArpPlayMode.entries.forEach { mode ->
+                    DropdownMenuItem(
+                        text = { Text(mode.shortLabel()) },
+                        onClick = {
+                            playModeMenuExpanded = false
+                            onStateChange(state.copy(playMode = mode))
+                        }
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            ProtoValueField(
+                label = "CLDV",
+                value = state.tempoDivisor.toString(),
+                onClick = { divisorMenuExpanded = true }
+            )
+            DropdownMenu(
+                expanded = divisorMenuExpanded,
+                onDismissRequest = { divisorMenuExpanded = false }
+            ) {
+                (GINA_ARP_MIN_TEMPO_DIVISOR..GINA_ARP_MAX_TEMPO_DIVISOR).forEach { divisor ->
+                    DropdownMenuItem(
+                        text = { Text(divisor.toString()) },
+                        onClick = {
+                            divisorMenuExpanded = false
+                            onStateChange(state.copy(tempoDivisor = divisor))
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
         Box(modifier = Modifier.weight(1f)) {
             ProtoValueField(
                 label = "KEY",
@@ -200,32 +269,26 @@ private fun GlobalControls(
 
         Box(modifier = Modifier.weight(1f)) {
             ProtoValueField(
-                label = "PLAY",
-                value = state.playMode.shortLabel(),
-                onClick = { playModeMenuExpanded = true }
+                label = "OFFS",
+                value = formatOffsetLabel(state.globalNoteOffset),
+                onClick = { offsetMenuExpanded = true }
             )
-
             DropdownMenu(
-                expanded = playModeMenuExpanded,
-                onDismissRequest = { playModeMenuExpanded = false }
+                expanded = offsetMenuExpanded,
+                onDismissRequest = { offsetMenuExpanded = false }
             ) {
-                GinaArpPlayMode.entries.forEach { mode ->
+                (GINA_ARP_MIN_NOTE_OFFSET..GINA_ARP_MAX_NOTE_OFFSET).forEach { offset ->
                     DropdownMenuItem(
-                        text = { Text(mode.shortLabel()) },
+                        text = { Text(formatOffsetLabel(offset)) },
                         onClick = {
-                            playModeMenuExpanded = false
-                            onStateChange(state.copy(playMode = mode))
+                            offsetMenuExpanded = false
+                            onStateChange(state.copy(globalNoteOffset = offset))
                         }
                     )
                 }
             }
         }
-    }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
         Box(modifier = Modifier.weight(1f)) {
             ProtoValueField(
                 label = "SEED",
@@ -247,83 +310,12 @@ private fun GlobalControls(
                 }
             }
         }
-
-        Box(modifier = Modifier.weight(1f)) {
-            ProtoValueField(
-                label = "CLDV",
-                value = state.tempoDivisor.toString(),
-                onClick = { divisorMenuExpanded = true }
-            )
-            DropdownMenu(
-                expanded = divisorMenuExpanded,
-                onDismissRequest = { divisorMenuExpanded = false }
-            ) {
-                (GINA_ARP_MIN_TEMPO_DIVISOR..GINA_ARP_MAX_TEMPO_DIVISOR).forEach { divisor ->
-                    DropdownMenuItem(
-                        text = { Text(divisor.toString()) },
-                        onClick = {
-                            divisorMenuExpanded = false
-                            onStateChange(state.copy(tempoDivisor = divisor))
-                        }
-                    )
-                }
-            }
-        }
-
-        ProtoValueField(
-            label = "CHNL",
-            value = state.midiChannel.toString(),
-            onDecrement = {
-                onStateChange(
-                    state.copy(midiChannel = (state.midiChannel - 1).coerceAtLeast(GINA_ARP_MIN_MIDI_CHANNEL))
-                )
-            },
-            onIncrement = {
-                onStateChange(
-                    state.copy(midiChannel = (state.midiChannel + 1).coerceAtMost(GINA_ARP_MAX_MIDI_CHANNEL))
-                )
-            },
-            modifier = Modifier.weight(1f)
-        )
     }
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(modifier = Modifier.weight(1f)) {
-            ProtoSliderRow(
-                label = "OFFS",
-                value = state.globalNoteOffset.toFloat(),
-                valueText = when {
-                    state.globalNoteOffset > 0 -> "+${state.globalNoteOffset}"
-                    else -> state.globalNoteOffset.toString()
-                },
-                onValueChange = { onStateChange(state.copy(globalNoteOffset = it.toInt())) },
-                valueRange = GINA_ARP_MIN_NOTE_OFFSET.toFloat()..GINA_ARP_MAX_NOTE_OFFSET.toFloat(),
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 52.dp),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = "-12", style = MaterialTheme.typography.labelSmall)
-                Text(text = "0", style = MaterialTheme.typography.labelSmall)
-                Text(text = "+12", style = MaterialTheme.typography.labelSmall)
-            }
-        }
-
-        ProtoSliderRow(
-            label = "RATIO",
-            value = state.globalRatioMultiplier,
-            valueText = "${(state.globalRatioMultiplier * 100).toInt()}%",
-            onValueChange = { onStateChange(state.copy(globalRatioMultiplier = it)) },
-            valueRange = -1f..1f,
-            modifier = Modifier.weight(1f)
-        )
-
         ProtoSliderRow(
             label = "GLEN",
             value = state.gateLength,
@@ -337,6 +329,15 @@ private fun GlobalControls(
             value = state.randomGateLength,
             valueText = "${(state.randomGateLength * 100).toInt()}%",
             onValueChange = { onStateChange(state.copy(randomGateLength = it)) },
+            modifier = Modifier.weight(1f)
+        )
+
+        ProtoSliderRow(
+            label = "RATIO",
+            value = state.globalRatioMultiplier,
+            valueText = "${(state.globalRatioMultiplier * 100).toInt()}%",
+            onValueChange = { onStateChange(state.copy(globalRatioMultiplier = it)) },
+            valueRange = -1f..1f,
             modifier = Modifier.weight(1f)
         )
 
