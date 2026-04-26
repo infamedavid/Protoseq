@@ -76,7 +76,7 @@ data class GinaArpSequencerUiState(
     val mode: GinaArpMode = GinaArpMode.MAJOR,
     val playMode: GinaArpPlayMode = GinaArpPlayMode.FORWARD,
     val seed: Int = GINA_ARP_MUTABLE_SEED,
-    val globalRatioMultiplier: Float = 1f,
+    val globalRatioMultiplier: Float = 0f,
     val globalNoteOffset: Int = 0,
     val tempoDivisor: Int = GINA_ARP_MIN_TEMPO_DIVISOR,
     val midiChannel: Int = GINA_ARP_DEFAULT_MIDI_CHANNEL,
