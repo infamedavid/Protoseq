@@ -23,7 +23,39 @@ class GinaArpSequencerUiStateTest {
         assertEquals(0.5f, state.gateLength)
         assertEquals(0f, state.randomGateLength)
         assertEquals(1f, state.bernoulliGate)
-        assertEquals(4, state.steps.first().arpLength)
+        assertEquals(1, state.steps.first().degree)
+        assertEquals(3, state.steps.first().octave)
+        assertEquals(0.25f, state.steps.first().ratio)
+        assertEquals(4, state.steps.first().divisions)
+        assertEquals(2, state.steps.first().arpLength)
+        assertEquals(100, state.steps.first().velocity)
+    }
+
+    @Test
+    fun defaultStepStateUsesMusicalStartingPoint() {
+        val step = GinaArpStepState()
+
+        assertEquals(1, step.degree)
+        assertEquals(3, step.octave)
+        assertEquals(0.25f, step.ratio)
+        assertEquals(4, step.divisions)
+        assertEquals(2, step.arpLength)
+        assertEquals(100, step.velocity)
+    }
+
+    @Test
+    fun defaultGinaArpStepsUseStepDefaults() {
+        val steps = defaultGinaArpSteps()
+
+        assertEquals(8, steps.size)
+        steps.forEach { step ->
+            assertEquals(1, step.degree)
+            assertEquals(3, step.octave)
+            assertEquals(0.25f, step.ratio)
+            assertEquals(4, step.divisions)
+            assertEquals(2, step.arpLength)
+            assertEquals(100, step.velocity)
+        }
     }
 
     @Test
@@ -129,7 +161,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(8, fewer.steps[0].octave)
         assertEquals(0f, fewer.steps[0].ratio)
         assertEquals(7, fewer.steps[0].divisions)
-        assertEquals(4, fewer.steps[0].arpLength)
+        assertEquals(2, fewer.steps[0].arpLength)
         assertEquals(1, fewer.steps[0].velocity)
         assertEquals(GinaArpStepState(), fewer.steps.last())
 

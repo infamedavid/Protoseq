@@ -51,9 +51,9 @@ data class GinaArpStepState(
     val enabled: Boolean = false,
     val degree: Int = 1,
     val octave: Int = 3,
-    val ratio: Float = 0.5f,
-    val divisions: Int = 2,
-    val arpLength: Int = 4,
+    val ratio: Float = 0.25f,
+    val divisions: Int = 4,
+    val arpLength: Int = 2,
     val velocity: Int = 100,
 )
 
