@@ -6,6 +6,8 @@ const val GINA_ARP_MAX_SEQUENCE_LENGTH = 8
 
 const val GINA_ARP_MIN_STEP_DIVISIONS = 1
 const val GINA_ARP_MAX_STEP_DIVISIONS = 7
+const val GINA_ARP_MIN_ARP_LENGTH = 1
+const val GINA_ARP_MAX_ARP_LENGTH = 7
 
 const val GINA_ARP_MIN_SEED = 1
 const val GINA_ARP_MAX_SEED = 100
@@ -47,6 +49,7 @@ data class GinaArpStepState(
     val octave: Int = 3,
     val ratio: Float = 0.5f,
     val divisions: Int = 2,
+    val arpLength: Int = 4,
     val velocity: Int = 100,
 )
 
@@ -56,6 +59,7 @@ fun GinaArpStepState.normalized(): GinaArpStepState =
         octave = octave.coerceIn(GINA_ARP_MIN_OCTAVE, GINA_ARP_MAX_OCTAVE),
         ratio = ratio.coerceIn(0f, 1f),
         divisions = divisions.coerceIn(GINA_ARP_MIN_STEP_DIVISIONS, GINA_ARP_MAX_STEP_DIVISIONS),
+        arpLength = arpLength.coerceIn(GINA_ARP_MIN_ARP_LENGTH, GINA_ARP_MAX_ARP_LENGTH),
         velocity = velocity.coerceIn(GINA_ARP_MIN_VELOCITY, GINA_ARP_MAX_VELOCITY),
     )
 

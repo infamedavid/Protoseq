@@ -318,6 +318,14 @@ fun generateGinaArpNote(
         return null
     }
 
+    if (shouldGinaArpForceRoot(divisionIndex = divisionIndex, arpLength = step.arpLength)) {
+        return generateGinaArpRootNote(
+            state = normalizedState,
+            stepIndex = stepIndex,
+            divisionIndex = divisionIndex,
+        )
+    }
+
     val candidates = generateGinaArpNoteCandidates(normalizedState, step)
     val selectionRandom = if (normalizedState.seed == GINA_ARP_MUTABLE_SEED) {
         random
@@ -336,6 +344,41 @@ fun generateGinaArpNote(
     return GinaArpGeneratedNote(
         midiNote = finalMidi,
         velocity = step.velocity.coerceIn(GINA_ARP_MIN_VELOCITY, GINA_ARP_MAX_VELOCITY),
+        stepIndex = stepIndex,
+        divisionIndex = divisionIndex,
+    )
+}
+
+fun shouldGinaArpForceRoot(
+    divisionIndex: Int,
+    arpLength: Int,
+): Boolean {
+    val normalizedArpLength = arpLength.coerceIn(GINA_ARP_MIN_ARP_LENGTH, GINA_ARP_MAX_ARP_LENGTH)
+    if (divisionIndex <= 0) {
+        return true
+    }
+    return divisionIndex % normalizedArpLength == 0
+}
+
+fun generateGinaArpRootNote(
+    state: GinaArpSequencerUiState,
+    stepIndex: Int,
+    divisionIndex: Int,
+): GinaArpGeneratedNote? {
+    val normalizedState = state.normalized()
+    if (stepIndex !in 0 until GINA_ARP_STEP_COUNT) {
+        return null
+    }
+    val step = normalizedState.steps[stepIndex].normalized()
+    if (!step.enabled) {
+        return null
+    }
+
+    val rootMidi = resolveGinaArpStepRootMidiNote(normalizedState, step)
+    val finalMidi = (rootMidi + normalizedState.globalNoteOffset).coerceIn(0, 127)
+    return GinaArpGeneratedNote(
+        midiNote = finalMidi,
+        velocity = step.velocity,
         stepIndex = stepIndex,
         divisionIndex = divisionIndex,
     )
