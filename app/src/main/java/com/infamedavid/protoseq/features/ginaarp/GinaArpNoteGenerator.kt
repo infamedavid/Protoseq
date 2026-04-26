@@ -135,11 +135,19 @@ fun ginaArpRangeSemitones(
     stepRatio: Float,
     globalRatioMultiplier: Float,
 ): Int {
-    val clampedRatio = stepRatio.coerceIn(0f, 1f)
-    val clampedMultiplier = globalRatioMultiplier.coerceIn(-1f, 1f)
-    val effectiveRatio = (clampedRatio + clampedMultiplier).coerceIn(0f, 1f)
+    val effectiveRatio = effectiveGinaArpRatio(
+        stepRatio = stepRatio,
+        globalRatioOffset = globalRatioMultiplier,
+    )
     return (48f * effectiveRatio).roundToInt()
 }
+
+fun effectiveGinaArpRatio(
+    stepRatio: Float,
+    globalRatioOffset: Float,
+): Float =
+    (stepRatio.coerceIn(0f, 1f) + globalRatioOffset.coerceIn(-1f, 1f))
+        .coerceIn(0f, 1f)
 
 data class GinaArpNoteCandidate(
     val midiNote: Int,
@@ -190,8 +198,10 @@ fun generateGinaArpNoteCandidates(
 
     val rootMidi = resolveGinaArpStepRootMidiNote(normalizedState, normalizedStep)
     val rangeSemitones = ginaArpRangeSemitones(normalizedStep.ratio, normalizedState.globalRatioMultiplier)
-    val effectiveRatio = (normalizedStep.ratio.coerceIn(0f, 1f) + normalizedState.globalRatioMultiplier.coerceIn(-1f, 1f))
-        .coerceIn(0f, 1f)
+    val effectiveRatio = effectiveGinaArpRatio(
+        stepRatio = normalizedStep.ratio,
+        globalRatioOffset = normalizedState.globalRatioMultiplier,
+    )
 
     val windowMin = (rootMidi - rangeSemitones).coerceIn(0, 127)
     val windowMax = (rootMidi + rangeSemitones).coerceIn(0, 127)

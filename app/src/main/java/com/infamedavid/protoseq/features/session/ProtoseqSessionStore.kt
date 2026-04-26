@@ -604,7 +604,7 @@ private fun ginaArpStateFromJsonObject(
         ),
         seed = json.optInt("seed", defaultState.seed),
         globalRatioMultiplier = json
-            .optDouble("globalRatioMultiplier", defaultState.globalRatioMultiplier.toDouble())
+            .optDouble("globalRatioMultiplier", 0.0)
             .toFloat(),
         globalNoteOffset = json.optInt("globalNoteOffset", defaultState.globalNoteOffset),
         tempoDivisor = json.optInt("tempoDivisor", defaultState.tempoDivisor),

@@ -98,8 +98,17 @@ class GinaArpNoteGeneratorTest {
         assertEquals(24, ginaArpRangeSemitones(0.5f, 0f))
         assertEquals(36, ginaArpRangeSemitones(0.5f, 0.25f))
         assertEquals(12, ginaArpRangeSemitones(0.5f, -0.25f))
-        assertEquals(0, ginaArpRangeSemitones(0f, -1f))
-        assertEquals(48, ginaArpRangeSemitones(1f, 1f))
+        assertEquals(48, ginaArpRangeSemitones(1f, 0f))
+        assertEquals(0, ginaArpRangeSemitones(0f, 0f))
+    }
+
+    @Test
+    fun effectiveRatioUsesAdditiveOffsetAndClamps() {
+        assertEquals(0.5f, effectiveGinaArpRatio(0.5f, 0f))
+        assertEquals(0.75f, effectiveGinaArpRatio(0.5f, 0.25f))
+        assertEquals(0.25f, effectiveGinaArpRatio(0.5f, -0.25f))
+        assertEquals(0f, effectiveGinaArpRatio(0.2f, -0.5f))
+        assertEquals(1f, effectiveGinaArpRatio(0.8f, 0.5f))
     }
 
     @Test
@@ -163,6 +172,44 @@ class GinaArpNoteGeneratorTest {
         val ratioChangedState = seed2State.updateStep(0) { it.copy(ratio = 0.33f) }
         val ratioChangedNote = generateGinaArpNote(ratioChangedState, stepIndex = 0, divisionIndex = 1)
         assertNotEquals(division1?.midiNote, ratioChangedNote?.midiNote)
+    }
+
+    @Test
+    fun neutralGlobalRatioCandidateGenerationDoesNotCollapseToRoot() {
+        val step = GinaArpStepState(enabled = true, octave = 3, degree = 1, ratio = 0.5f)
+        val state = GinaArpSequencerUiState(
+            keyRootSemitone = 0,
+            mode = GinaArpMode.MAJOR,
+            seed = GINA_ARP_MUTABLE_SEED,
+            globalRatioMultiplier = 0f,
+        )
+
+        val candidates = generateGinaArpNoteCandidates(state, step)
+        val rootMidi = resolveGinaArpStepRootMidiNote(state.normalized(), step.normalized())
+
+        assertTrue(candidates.isNotEmpty())
+        assertTrue(candidates.any { it.midiNote != rootMidi })
+        assertTrue(candidates.map { it.midiNote }.distinct().size > 1)
+    }
+
+    @Test
+    fun immutableSeedWithNeutralGlobalRatioRemainsDeterministicWithoutCollapsedWindow() {
+        val state = mutableStateForStep(
+            stepIndex = 0,
+            seed = 2,
+            arpLength = 7,
+            ratio = 0.5f,
+            globalRatioMultiplier = 0f,
+        )
+
+        val first = generateGinaArpNote(state, stepIndex = 0, divisionIndex = 1, random = Random(1))
+        val second = generateGinaArpNote(state, stepIndex = 0, divisionIndex = 1, random = Random(999))
+        assertEquals(first, second)
+
+        val step = state.normalized().steps[0]
+        val candidates = generateGinaArpNoteCandidates(state, step)
+        val rootMidi = resolveGinaArpStepRootMidiNote(state.normalized(), step)
+        assertTrue(candidates.any { it.midiNote != rootMidi })
     }
 
     @Test
@@ -256,13 +303,15 @@ class GinaArpNoteGeneratorTest {
         arpLength: Int = 4,
         octave: Int = 4,
         degree: Int = 1,
+        ratio: Float = 1f,
+        globalRatioMultiplier: Float = 1f,
     ): GinaArpSequencerUiState {
         val steps = List(GINA_ARP_STEP_COUNT) { GinaArpStepState() }.toMutableList()
         steps[stepIndex] = GinaArpStepState(
             enabled = true,
             degree = degree,
             octave = octave,
-            ratio = 1f,
+            ratio = ratio,
             arpLength = arpLength,
             velocity = 95,
         )
@@ -271,7 +320,7 @@ class GinaArpNoteGeneratorTest {
             keyRootSemitone = 0,
             mode = GinaArpMode.MAJOR,
             seed = seed,
-            globalRatioMultiplier = 1f,
+            globalRatioMultiplier = globalRatioMultiplier,
             globalNoteOffset = 0,
             steps = steps,
         )
