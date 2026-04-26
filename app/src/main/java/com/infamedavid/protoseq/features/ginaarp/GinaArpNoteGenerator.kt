@@ -1,6 +1,5 @@
 package com.infamedavid.protoseq.features.ginaarp
 
-import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -138,7 +137,7 @@ fun ginaArpRangeSemitones(
 ): Int {
     val clampedRatio = stepRatio.coerceIn(0f, 1f)
     val clampedMultiplier = globalRatioMultiplier.coerceIn(-1f, 1f)
-    val effectiveRatio = clampedRatio * abs(clampedMultiplier)
+    val effectiveRatio = (clampedRatio + clampedMultiplier).coerceIn(0f, 1f)
     return (48f * effectiveRatio).roundToInt()
 }
 
@@ -150,13 +149,10 @@ data class GinaArpNoteCandidate(
 )
 
 fun ginaArpCandidateWeight(
-    midiNote: Int,
-    rootMidiNote: Int,
     intervalClass: Int,
     zone: GinaArpRegisterZone,
     mode: GinaArpMode,
     effectiveRatio: Float,
-    globalRatioMultiplier: Float,
 ): Float {
     val normalizedInterval = ((intervalClass % 12) + 12) % 12
 
@@ -178,14 +174,6 @@ fun ginaArpCandidateWeight(
 
     weight *= (1f + zone.ordinal * 0.10f)
 
-    if (globalRatioMultiplier < 0f) {
-        if (midiNote < rootMidiNote) {
-            weight *= 1.35f
-        } else if (midiNote > rootMidiNote) {
-            weight *= 0.75f
-        }
-    }
-
     if (mode == GinaArpMode.MINOR_PENTATONIC && normalizedInterval == 9) {
         weight *= 0.9f
     }
@@ -202,7 +190,8 @@ fun generateGinaArpNoteCandidates(
 
     val rootMidi = resolveGinaArpStepRootMidiNote(normalizedState, normalizedStep)
     val rangeSemitones = ginaArpRangeSemitones(normalizedStep.ratio, normalizedState.globalRatioMultiplier)
-    val effectiveRatio = normalizedStep.ratio.coerceIn(0f, 1f) * abs(normalizedState.globalRatioMultiplier.coerceIn(-1f, 1f))
+    val effectiveRatio = (normalizedStep.ratio.coerceIn(0f, 1f) + normalizedState.globalRatioMultiplier.coerceIn(-1f, 1f))
+        .coerceIn(0f, 1f)
 
     val windowMin = (rootMidi - rangeSemitones).coerceIn(0, 127)
     val windowMax = (rootMidi + rangeSemitones).coerceIn(0, 127)
@@ -218,13 +207,10 @@ fun generateGinaArpNoteCandidates(
                 intervalClass = intervalClass,
                 zone = zone,
                 weight = ginaArpCandidateWeight(
-                    midiNote = midiNote,
-                    rootMidiNote = rootMidi,
                     intervalClass = intervalClass,
                     zone = zone,
                     mode = normalizedState.mode,
                     effectiveRatio = effectiveRatio,
-                    globalRatioMultiplier = normalizedState.globalRatioMultiplier,
                 ),
             )
         }

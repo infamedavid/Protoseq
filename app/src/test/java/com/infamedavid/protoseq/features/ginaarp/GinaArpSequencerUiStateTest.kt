@@ -19,6 +19,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(GinaArpPlayMode.FORWARD, state.playMode)
         assertEquals(1, state.tempoDivisor)
         assertEquals(3, state.midiChannel)
+        assertEquals(0f, state.globalRatioMultiplier)
         assertEquals(0.5f, state.gateLength)
         assertEquals(0f, state.randomGateLength)
         assertEquals(1f, state.bernoulliGate)

@@ -94,12 +94,12 @@ class GinaArpNoteGeneratorTest {
     }
 
     @Test
-    fun rangeSemitonesUsesRatioAndMultiplier() {
-        assertEquals(0, ginaArpRangeSemitones(0f, 1f))
-        assertEquals(24, ginaArpRangeSemitones(0.5f, 1f))
+    fun rangeSemitonesUsesAdditiveNeutralRatioOffset() {
+        assertEquals(24, ginaArpRangeSemitones(0.5f, 0f))
+        assertEquals(36, ginaArpRangeSemitones(0.5f, 0.25f))
+        assertEquals(12, ginaArpRangeSemitones(0.5f, -0.25f))
+        assertEquals(0, ginaArpRangeSemitones(0f, -1f))
         assertEquals(48, ginaArpRangeSemitones(1f, 1f))
-        assertEquals(0, ginaArpRangeSemitones(1f, 0f))
-        assertEquals(48, ginaArpRangeSemitones(1f, -1f))
     }
 
     @Test
