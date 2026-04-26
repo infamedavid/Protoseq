@@ -94,6 +94,38 @@ class GinaArpSequencerUiStateTest {
     }
 
     @Test
+    fun withCopiedMusicalSettingsFromCopiesMusicalFieldsAndPreservesEnabled() {
+        val current = GinaArpStepState(
+            enabled = false,
+            degree = 1,
+            octave = 0,
+            ratio = 0.1f,
+            divisions = 1,
+            arpLength = 1,
+            velocity = 1,
+        )
+        val copied = GinaArpStepState(
+            enabled = true,
+            degree = 8,
+            octave = 8,
+            ratio = 2f,
+            divisions = 7,
+            arpLength = 7,
+            velocity = 200,
+        )
+
+        val pasted = current.withCopiedMusicalSettingsFrom(copied)
+
+        assertFalse(pasted.enabled)
+        assertEquals(8, pasted.degree)
+        assertEquals(8, pasted.octave)
+        assertEquals(1f, pasted.ratio)
+        assertEquals(7, pasted.divisions)
+        assertEquals(7, pasted.arpLength)
+        assertEquals(127, pasted.velocity)
+    }
+
+    @Test
     fun mainStateNormalizationClampsAllRanges() {
         val low = GinaArpSequencerUiState(
             sequenceLength = 0,

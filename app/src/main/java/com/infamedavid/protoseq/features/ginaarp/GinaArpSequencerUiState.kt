@@ -70,6 +70,17 @@ fun GinaArpStepState.normalized(): GinaArpStepState =
 fun defaultGinaArpSteps(): List<GinaArpStepState> =
     List(GINA_ARP_STEP_COUNT) { GinaArpStepState() }
 
+fun GinaArpStepState.withCopiedMusicalSettingsFrom(copied: GinaArpStepState): GinaArpStepState =
+    copy(
+        degree = copied.degree,
+        octave = copied.octave,
+        ratio = copied.ratio,
+        divisions = copied.divisions,
+        arpLength = copied.arpLength,
+        velocity = copied.velocity,
+        enabled = enabled,
+    ).normalized()
+
 data class GinaArpSequencerUiState(
     val sequenceLength: Int = GINA_ARP_MAX_SEQUENCE_LENGTH,
     val keyRootSemitone: Int = 0,
