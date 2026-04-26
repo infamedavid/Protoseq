@@ -459,6 +459,31 @@ class ProtoseqSessionStoreTest {
     }
 
     @Test
+    fun ginaArpMissingGlobalRatioFallsBackToNeutralOffset() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put(
+                            "ginaArpState",
+                            JSONObject()
+                                .put("sequenceLength", 4)
+                                .put("seed", 44)
+                                .put("globalNoteOffset", 3)
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(0f, decoded.pages[0].ginaArpState.globalRatioMultiplier)
+    }
+
+    @Test
     fun missingArpLengthFallsBackToStepDefault() {
         val json = JSONObject()
             .put("version", 1)
