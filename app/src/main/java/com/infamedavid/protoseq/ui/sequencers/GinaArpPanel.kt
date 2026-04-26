@@ -31,15 +31,12 @@ import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_OCTAVE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_NOTE_OFFSET
-import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_TEMPO_DIVISOR
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_OCTAVE
-import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_NOTE_OFFSET
-import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_TEMPO_DIVISOR
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MUTABLE_SEED
@@ -112,17 +109,43 @@ fun GinaArpPanel(
         )
     }
 
-    if (editingStepIndex != null) {
-        val stepIndex = editingStepIndex ?: 0
-        val step = state.steps.getOrNull(stepIndex) ?: GinaArpStepState()
+    val editingIndex = editingStepIndex
+    if (editingIndex != null) {
+        val step = state.steps.getOrNull(editingIndex) ?: GinaArpStepState()
         StepEditorDialog(
-            stepIndex = stepIndex,
-            initialStep = step,
-            onDismiss = { editingStepIndex = null },
-            onConfirm = { updatedStep ->
-                applyState(state.updateStep(stepIndex) { updatedStep })
-                editingStepIndex = null
-            }
+            stepIndex = editingIndex,
+            step = step,
+            onClose = { editingStepIndex = null },
+            onDegreeChange = { value ->
+                applyState(state.updateStep(editingIndex) { current ->
+                    current.copy(degree = value).normalized()
+                })
+            },
+            onOctaveChange = { value ->
+                applyState(state.updateStep(editingIndex) { current ->
+                    current.copy(octave = value).normalized()
+                })
+            },
+            onDivisionsChange = { value ->
+                applyState(state.updateStep(editingIndex) { current ->
+                    current.copy(divisions = value).normalized()
+                })
+            },
+            onArpLengthChange = { value ->
+                applyState(state.updateStep(editingIndex) { current ->
+                    current.copy(arpLength = value).normalized()
+                })
+            },
+            onRatioChange = { value ->
+                applyState(state.updateStep(editingIndex) { current ->
+                    current.copy(ratio = value).normalized()
+                })
+            },
+            onVelocityChange = { value ->
+                applyState(state.updateStep(editingIndex) { current ->
+                    current.copy(velocity = value).normalized()
+                })
+            },
         )
     }
 }
@@ -425,14 +448,17 @@ private fun GinaArpStepGrid(
 @Composable
 private fun StepEditorDialog(
     stepIndex: Int,
-    initialStep: GinaArpStepState,
-    onDismiss: () -> Unit,
-    onConfirm: (GinaArpStepState) -> Unit,
+    step: GinaArpStepState,
+    onClose: () -> Unit,
+    onDegreeChange: (Int) -> Unit,
+    onOctaveChange: (Int) -> Unit,
+    onDivisionsChange: (Int) -> Unit,
+    onArpLengthChange: (Int) -> Unit,
+    onRatioChange: (Float) -> Unit,
+    onVelocityChange: (Int) -> Unit,
 ) {
-    var draft by remember(initialStep) { mutableStateOf(initialStep) }
-
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = onClose,
         title = { Text("Step ${stepIndex + 1}") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -442,75 +468,57 @@ private fun StepEditorDialog(
                 ) {
                     ProtoValueField(
                         label = "DEG",
-                        value = draft.degree.toString(),
-                        onDecrement = { draft = draft.copy(degree = draft.degree - 1) },
-                        onIncrement = { draft = draft.copy(degree = draft.degree + 1) },
+                        value = step.degree.toString(),
+                        onDecrement = { onDegreeChange(step.degree - 1) },
+                        onIncrement = { onDegreeChange(step.degree + 1) },
                         modifier = Modifier.weight(1f)
                     )
                     ProtoValueField(
                         label = "OCT",
-                        value = draft.octave.toString(),
-                        onDecrement = { draft = draft.copy(octave = draft.octave - 1) },
-                        onIncrement = { draft = draft.copy(octave = draft.octave + 1) },
+                        value = step.octave.toString(),
+                        onDecrement = { onOctaveChange(step.octave - 1) },
+                        onIncrement = { onOctaveChange(step.octave + 1) },
                         modifier = Modifier.weight(1f)
                     )
                     ProtoValueField(
-                        label = "DIVS",
-                        value = draft.divisions.toString(),
-                        onDecrement = { draft = draft.copy(divisions = draft.divisions - 1) },
-                        onIncrement = { draft = draft.copy(divisions = draft.divisions + 1) },
+                        label = "SLEN",
+                        value = step.divisions.toString(),
+                        onDecrement = { onDivisionsChange(step.divisions - 1) },
+                        onIncrement = { onDivisionsChange(step.divisions + 1) },
                         modifier = Modifier.weight(1f)
                     )
                     ProtoValueField(
                         label = "ALEN",
-                        value = draft.arpLength.toString(),
-                        onDecrement = { draft = draft.copy(arpLength = draft.arpLength - 1) },
-                        onIncrement = { draft = draft.copy(arpLength = draft.arpLength + 1) },
+                        value = step.arpLength.toString(),
+                        onDecrement = { onArpLengthChange(step.arpLength - 1) },
+                        onIncrement = { onArpLengthChange(step.arpLength + 1) },
                         modifier = Modifier.weight(1f)
                     )
                 }
 
                 ProtoSliderRow(
                     label = "RATIO",
-                    value = draft.ratio,
-                    valueText = "${(draft.ratio * 100).toInt()}%",
-                    onValueChange = { ratio -> draft = draft.copy(ratio = ratio) }
+                    value = step.ratio,
+                    valueText = "${(step.ratio * 100).toInt()}%",
+                    onValueChange = onRatioChange
                 )
 
                 ProtoSliderRow(
                     label = "VEL",
-                    value = ((draft.velocity - GINA_ARP_MIN_VELOCITY).toFloat() /
+                    value = ((step.velocity - GINA_ARP_MIN_VELOCITY).toFloat() /
                             (GINA_ARP_MAX_VELOCITY - GINA_ARP_MIN_VELOCITY).toFloat()),
-                    valueText = draft.velocity.toString(),
+                    valueText = step.velocity.toString(),
                     onValueChange = { normalized ->
                         val mapped = GINA_ARP_MIN_VELOCITY +
                                 (normalized * (GINA_ARP_MAX_VELOCITY - GINA_ARP_MIN_VELOCITY)).toInt()
-                        draft = draft.copy(velocity = mapped)
+                        onVelocityChange(mapped)
                     }
                 )
             }
         },
         confirmButton = {
-            TextButton(
-                onClick = {
-                    onConfirm(
-                        draft.copy(
-                            degree = draft.degree.coerceIn(GINA_ARP_MIN_DEGREE, GINA_ARP_MAX_DEGREE),
-                            octave = draft.octave.coerceIn(GINA_ARP_MIN_OCTAVE, GINA_ARP_MAX_OCTAVE),
-                            divisions = draft.divisions.coerceIn(GINA_ARP_MIN_STEP_DIVISIONS, GINA_ARP_MAX_STEP_DIVISIONS),
-                            arpLength = draft.arpLength.coerceIn(GINA_ARP_MIN_ARP_LENGTH, GINA_ARP_MAX_ARP_LENGTH),
-                            velocity = draft.velocity.coerceIn(GINA_ARP_MIN_VELOCITY, GINA_ARP_MAX_VELOCITY),
-                            ratio = draft.ratio.coerceIn(0f, 1f)
-                        )
-                    )
-                }
-            ) {
-                Text("OK")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
+            TextButton(onClick = onClose) {
+                Text("CLOSE")
             }
         }
     )
