@@ -644,7 +644,7 @@ fun AppScreen() {
                             showLoadStateDialog = false
                             saveDialogValidationMessage = ""
                             sessionStore.clearLastSession()
-                            sessionStatusMessage = "Session cleared"
+                            sessionStatusMessage = ""
                         },
                         modifier = Modifier.size(width = 72.dp, height = 44.dp),
                         shape = ProtoControlShape,
