@@ -482,7 +482,7 @@ class TransportViewModel(
                     random = runtime.random
                 )
                 if (generated != null) {
-                    val channel = 1
+                    val channel = state.midiChannel.coerceIn(1, 16)
                     sendPageNoteOnLocked(
                         pageIndex = pageIndex,
                         channel = channel,

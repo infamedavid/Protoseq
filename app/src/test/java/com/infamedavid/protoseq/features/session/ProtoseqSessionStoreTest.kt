@@ -1,7 +1,9 @@
 package com.infamedavid.protoseq.features.session
 
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_SEED
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_SEQUENCE_LENGTH
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_SEED
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_SEQUENCE_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GinaArpMode
@@ -260,6 +262,7 @@ class ProtoseqSessionStoreTest {
         assertEquals(1, ginaArp.seed)
         assertEquals(GinaArpMode.MAJOR, ginaArp.mode)
         assertEquals(GinaArpPlayMode.FORWARD, ginaArp.playMode)
+        assertEquals(3, ginaArp.midiChannel)
     }
 
     @Test
@@ -273,6 +276,7 @@ class ProtoseqSessionStoreTest {
             globalRatioMultiplier = 0.75f,
             globalNoteOffset = -9,
             tempoDivisor = 6,
+            midiChannel = 13,
             gateLength = 0.3f,
             randomGateLength = 0.2f,
             bernoulliGate = 0.4f,
@@ -381,6 +385,7 @@ class ProtoseqSessionStoreTest {
                                 JSONObject()
                                     .put("sequenceLength", GINA_ARP_MAX_SEQUENCE_LENGTH + 10)
                                     .put("seed", GINA_ARP_MIN_SEED - 10)
+                                    .put("midiChannel", GINA_ARP_MAX_MIDI_CHANNEL + 10)
                                     .put("mode", "NOT_A_MODE")
                                     .put("playMode", "NOT_A_PLAY_MODE")
                                     .put("steps", tooFewSteps)
@@ -394,6 +399,7 @@ class ProtoseqSessionStoreTest {
                                 JSONObject()
                                     .put("sequenceLength", GINA_ARP_MIN_SEQUENCE_LENGTH - 5)
                                     .put("seed", GINA_ARP_MAX_SEED + 100)
+                                    .put("midiChannel", GINA_ARP_MIN_MIDI_CHANNEL - 10)
                                     .put("mode", "WRONG")
                                     .put("playMode", "WRONG")
                                     .put("steps", tooManySteps)
@@ -409,6 +415,7 @@ class ProtoseqSessionStoreTest {
         assertEquals(GINA_ARP_MIN_SEED, page0State.seed)
         assertEquals(GinaArpMode.MAJOR, page0State.mode)
         assertEquals(GinaArpPlayMode.FORWARD, page0State.playMode)
+        assertEquals(GINA_ARP_MAX_MIDI_CHANNEL, page0State.midiChannel)
         assertEquals(8, page0State.steps.size)
         assertEquals(1f, page0State.steps[0].ratio)
         assertEquals(7, page0State.steps[0].divisions)
@@ -419,11 +426,36 @@ class ProtoseqSessionStoreTest {
         assertEquals(GINA_ARP_MAX_SEED, page1State.seed)
         assertEquals(GinaArpMode.MAJOR, page1State.mode)
         assertEquals(GinaArpPlayMode.FORWARD, page1State.playMode)
+        assertEquals(GINA_ARP_MIN_MIDI_CHANNEL, page1State.midiChannel)
         assertEquals(8, page1State.steps.size)
         assertEquals(0f, page1State.steps[0].ratio)
         assertEquals(1, page1State.steps[0].divisions)
         assertEquals(1, page1State.steps[0].arpLength)
         assertEquals(127, page1State.steps[0].velocity)
+    }
+
+    @Test
+    fun ginaArpMissingMidiChannelFallsBackToDefault() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put(
+                            "ginaArpState",
+                            JSONObject()
+                                .put("sequenceLength", 4)
+                                .put("seed", 44)
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(3, decoded.pages[0].ginaArpState.midiChannel)
     }
 
     @Test
