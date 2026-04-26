@@ -1,6 +1,11 @@
 package com.infamedavid.protoseq.features.session
 
 import android.content.Context
+import com.infamedavid.protoseq.features.ginaarp.GinaArpMode
+import com.infamedavid.protoseq.features.ginaarp.GinaArpPlayMode
+import com.infamedavid.protoseq.features.ginaarp.GinaArpSequencerUiState
+import com.infamedavid.protoseq.features.ginaarp.GinaArpStepState
+import com.infamedavid.protoseq.features.ginaarp.normalized
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.Grid616StepState
 import com.infamedavid.protoseq.features.grid616.Grid616TrackState
@@ -191,6 +196,7 @@ fun ProtoseqSessionState.toJsonObject(): JSONObject {
                 .put("selectedSequencerType", page.selectedSequencerType.name)
                 .put("turingState", page.turingState.toJsonObject())
                 .put("grid616State", page.grid616State.toJsonObject())
+                .put("ginaArpState", page.ginaArpState.toJsonObject())
         )
     }
 
@@ -226,6 +232,10 @@ fun protoseqSessionStateFromJsonObject(json: JSONObject): ProtoseqSessionState {
             grid616State = grid616SequencerUiStateFromJsonObject(
                 pageJson.optJSONObject("grid616State"),
                 defaultPage.grid616State,
+            ),
+            ginaArpState = ginaArpStateFromJsonObject(
+                pageJson.optJSONObject("ginaArpState"),
+                defaultPage.ginaArpState,
             ),
         )
 
@@ -374,6 +384,35 @@ private fun Grid616CrptStepSnapshot.toJsonObject(): JSONObject = JSONObject()
     .put("enabled", enabled)
     .put("velocity", velocity)
     .put("delayTicks", delayTicks)
+
+private fun GinaArpSequencerUiState.toJsonObject(): JSONObject = JSONObject()
+    .put("sequenceLength", sequenceLength)
+    .put("keyRootSemitone", keyRootSemitone)
+    .put("mode", mode.name)
+    .put("playMode", playMode.name)
+    .put("seed", seed)
+    .put("globalRatioMultiplier", globalRatioMultiplier)
+    .put("globalNoteOffset", globalNoteOffset)
+    .put("tempoDivisor", tempoDivisor)
+    .put("gateLength", gateLength)
+    .put("randomGateLength", randomGateLength)
+    .put("bernoulliGate", bernoulliGate)
+    .put(
+        "steps",
+        JSONArray().apply {
+            steps.forEach { step ->
+                put(step.toJsonObject())
+            }
+        }
+    )
+
+private fun GinaArpStepState.toJsonObject(): JSONObject = JSONObject()
+    .put("enabled", enabled)
+    .put("degree", degree)
+    .put("octave", octave)
+    .put("ratio", ratio)
+    .put("divisions", divisions)
+    .put("velocity", velocity)
 
 private fun grid616SequencerUiStateFromJsonObject(
     json: JSONObject?,
@@ -534,6 +573,62 @@ private fun grid616CrptStepSnapshotFromJsonObject(
     velocity = json.optInt("velocity", Grid616StepState().velocity),
     delayTicks = json.optInt("delayTicks", Grid616StepState().delayTicks),
 ).normalized()
+
+private fun ginaArpStateFromJsonObject(
+    json: JSONObject?,
+    defaultState: GinaArpSequencerUiState = GinaArpSequencerUiState(),
+): GinaArpSequencerUiState {
+    if (json == null) return defaultState.normalized()
+
+    val steps = (json.optJSONArray("steps") ?: JSONArray()).let { stepsJson ->
+        buildList {
+            for (i in 0 until stepsJson.length()) {
+                val stepJson = stepsJson.optJSONObject(i)
+                add(ginaArpStepFromJsonObject(stepJson, GinaArpStepState()))
+            }
+        }
+    }
+
+    return defaultState.copy(
+        sequenceLength = json.optInt("sequenceLength", defaultState.sequenceLength),
+        keyRootSemitone = json.optInt("keyRootSemitone", defaultState.keyRootSemitone),
+        mode = enumValueOrDefault(
+            rawName = json.optString("mode", defaultState.mode.name),
+            default = GinaArpMode.MAJOR,
+        ),
+        playMode = enumValueOrDefault(
+            rawName = json.optString("playMode", defaultState.playMode.name),
+            default = GinaArpPlayMode.FORWARD,
+        ),
+        seed = json.optInt("seed", defaultState.seed),
+        globalRatioMultiplier = json
+            .optDouble("globalRatioMultiplier", defaultState.globalRatioMultiplier.toDouble())
+            .toFloat(),
+        globalNoteOffset = json.optInt("globalNoteOffset", defaultState.globalNoteOffset),
+        tempoDivisor = json.optInt("tempoDivisor", defaultState.tempoDivisor),
+        gateLength = json.optDouble("gateLength", defaultState.gateLength.toDouble()).toFloat(),
+        randomGateLength = json
+            .optDouble("randomGateLength", defaultState.randomGateLength.toDouble())
+            .toFloat(),
+        bernoulliGate = json.optDouble("bernoulliGate", defaultState.bernoulliGate.toDouble()).toFloat(),
+        steps = steps,
+    ).normalized()
+}
+
+private fun ginaArpStepFromJsonObject(
+    json: JSONObject?,
+    defaultStep: GinaArpStepState = GinaArpStepState(),
+): GinaArpStepState {
+    if (json == null) return defaultStep.normalized()
+    return defaultStep.copy(
+        enabled = json.optBoolean("enabled", defaultStep.enabled),
+        degree = json.optInt("degree", defaultStep.degree),
+        octave = json.optInt("octave", defaultStep.octave),
+        ratio = json.optDouble("ratio", defaultStep.ratio.toDouble()).toFloat(),
+        divisions = json.optInt("divisions", defaultStep.divisions),
+        velocity = json.optInt("velocity", defaultStep.velocity),
+    ).normalized()
+}
 
 private inline fun <reified T : Enum<T>> enumValueOrDefault(rawName: String?, default: T): T {
     if (rawName.isNullOrBlank()) return default

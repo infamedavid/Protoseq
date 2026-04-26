@@ -1,5 +1,14 @@
 package com.infamedavid.protoseq.features.session
 
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_SEED
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_SEQUENCE_LENGTH
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_SEED
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_SEQUENCE_LENGTH
+import com.infamedavid.protoseq.features.ginaarp.GinaArpMode
+import com.infamedavid.protoseq.features.ginaarp.GinaArpPlayMode
+import com.infamedavid.protoseq.features.ginaarp.GinaArpSequencerUiState
+import com.infamedavid.protoseq.features.ginaarp.GinaArpStepState
+import com.infamedavid.protoseq.features.ginaarp.normalized
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_DELAY_TICKS
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_STEPS
 import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_TRACK_LENGTH
@@ -204,6 +213,7 @@ class ProtoseqSessionStoreTest {
         assertTrue(serialized.contains("\"selectedSequencerType\""))
         assertTrue(serialized.contains("\"turingState\""))
         assertTrue(serialized.contains("\"grid616State\""))
+        assertTrue(serialized.contains("\"ginaArpState\""))
 
         val forbiddenRuntimeKeys = listOf(
             "pageRuntimes",
@@ -220,6 +230,178 @@ class ProtoseqSessionStoreTest {
         forbiddenRuntimeKeys.forEach { key ->
             assertFalse("Unexpected runtime key found in session JSON: $key", serialized.contains("\"$key\""))
         }
+    }
+
+    @Test
+    fun ginaArpDefaultStateRoundTripPreservesNormalizedDefaults() {
+        val session = ProtoseqSessionState()
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val ginaArp = decoded.pages[0].ginaArpState
+
+        assertEquals(GinaArpSequencerUiState().normalized(), ginaArp)
+        assertEquals(8, ginaArp.sequenceLength)
+        assertEquals(8, ginaArp.steps.size)
+        assertEquals(1, ginaArp.seed)
+        assertEquals(GinaArpMode.MAJOR, ginaArp.mode)
+        assertEquals(GinaArpPlayMode.FORWARD, ginaArp.playMode)
+    }
+
+    @Test
+    fun ginaArpCustomGlobalStateRoundTripPreservesValues() {
+        val customState = GinaArpSequencerUiState(
+            sequenceLength = 5,
+            keyRootSemitone = 11,
+            mode = GinaArpMode.DORIAN,
+            playMode = GinaArpPlayMode.PING_PONG,
+            seed = 42,
+            globalRatioMultiplier = 0.75f,
+            globalNoteOffset = -9,
+            tempoDivisor = 6,
+            gateLength = 0.3f,
+            randomGateLength = 0.2f,
+            bernoulliGate = 0.4f,
+        ).normalized()
+        val session = ProtoseqSessionState().updatePage(0) { page ->
+            page.copy(ginaArpState = customState)
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val ginaArp = decoded.pages[0].ginaArpState
+
+        assertEquals(customState, ginaArp)
+    }
+
+    @Test
+    fun ginaArpCustomStepsRoundTripPreservesValues() {
+        val customSteps = List(8) { GinaArpStepState() }.toMutableList().apply {
+            this[0] = GinaArpStepState(
+                enabled = true,
+                degree = 6,
+                octave = 5,
+                ratio = 0.8f,
+                divisions = 4,
+                velocity = 92,
+            )
+            this[3] = GinaArpStepState(
+                enabled = true,
+                degree = 2,
+                octave = 1,
+                ratio = 0.15f,
+                divisions = 7,
+                velocity = 45,
+            )
+        }
+        val customState = GinaArpSequencerUiState(steps = customSteps).normalized()
+        val session = ProtoseqSessionState().updatePage(2) { page ->
+            page.copy(ginaArpState = customState)
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val ginaArp = decoded.pages[2].ginaArpState
+
+        assertEquals(customState.steps[0], ginaArp.steps[0])
+        assertEquals(customState.steps[3], ginaArp.steps[3])
+    }
+
+    @Test
+    fun missingGinaArpStateFallsBackToDefaults() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("enabled", true)
+                        .put("selectedSequencerType", SequencerType.EMPTY.name)
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(GinaArpSequencerUiState().normalized(), decoded.pages[0].ginaArpState)
+    }
+
+    @Test
+    fun invalidIncompleteGinaArpStateNormalizesSafely() {
+        val tooFewSteps = JSONArray().put(
+            JSONObject()
+                .put("enabled", true)
+                .put("degree", 99)
+                .put("octave", -5)
+                .put("ratio", 9.1)
+                .put("divisions", 999)
+                .put("velocity", 0)
+        )
+        val tooManySteps = JSONArray().apply {
+            repeat(20) { index ->
+                put(
+                    JSONObject()
+                        .put("enabled", index % 2 == 0)
+                        .put("degree", if (index == 0) -1 else 4)
+                        .put("octave", 99)
+                        .put("ratio", -2.0)
+                        .put("divisions", 0)
+                        .put("velocity", 999)
+                )
+            }
+        }
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray()
+                    .put(
+                        JSONObject()
+                            .put("pageIndex", 0)
+                            .put(
+                                "ginaArpState",
+                                JSONObject()
+                                    .put("sequenceLength", GINA_ARP_MAX_SEQUENCE_LENGTH + 10)
+                                    .put("seed", GINA_ARP_MIN_SEED - 10)
+                                    .put("mode", "NOT_A_MODE")
+                                    .put("playMode", "NOT_A_PLAY_MODE")
+                                    .put("steps", tooFewSteps)
+                            )
+                    )
+                    .put(
+                        JSONObject()
+                            .put("pageIndex", 1)
+                            .put(
+                                "ginaArpState",
+                                JSONObject()
+                                    .put("sequenceLength", GINA_ARP_MIN_SEQUENCE_LENGTH - 5)
+                                    .put("seed", GINA_ARP_MAX_SEED + 100)
+                                    .put("mode", "WRONG")
+                                    .put("playMode", "WRONG")
+                                    .put("steps", tooManySteps)
+                            )
+                    )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        val page0State = decoded.pages[0].ginaArpState
+        val page1State = decoded.pages[1].ginaArpState
+
+        assertEquals(GINA_ARP_MAX_SEQUENCE_LENGTH, page0State.sequenceLength)
+        assertEquals(GINA_ARP_MIN_SEED, page0State.seed)
+        assertEquals(GinaArpMode.MAJOR, page0State.mode)
+        assertEquals(GinaArpPlayMode.FORWARD, page0State.playMode)
+        assertEquals(8, page0State.steps.size)
+        assertEquals(1f, page0State.steps[0].ratio)
+        assertEquals(7, page0State.steps[0].divisions)
+        assertEquals(1, page0State.steps[0].velocity)
+
+        assertEquals(GINA_ARP_MIN_SEQUENCE_LENGTH, page1State.sequenceLength)
+        assertEquals(GINA_ARP_MAX_SEED, page1State.seed)
+        assertEquals(GinaArpMode.MAJOR, page1State.mode)
+        assertEquals(GinaArpPlayMode.FORWARD, page1State.playMode)
+        assertEquals(8, page1State.steps.size)
+        assertEquals(0f, page1State.steps[0].ratio)
+        assertEquals(1, page1State.steps[0].divisions)
+        assertEquals(127, page1State.steps[0].velocity)
     }
 
     @Test
