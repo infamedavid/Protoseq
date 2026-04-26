@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_OCTAVE
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_SEQUENCE_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_MIDI_CHANNEL
@@ -37,6 +38,7 @@ import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_OCTAVE
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_SEQUENCE_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_NOTE_OFFSET
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_STEP_DIVISIONS
@@ -49,6 +51,7 @@ import com.infamedavid.protoseq.features.ginaarp.GinaArpSequencerUiState
 import com.infamedavid.protoseq.features.ginaarp.GinaArpStepState
 import com.infamedavid.protoseq.features.ginaarp.normalized
 import com.infamedavid.protoseq.features.ginaarp.updateStep
+import com.infamedavid.protoseq.features.ginaarp.withCopiedMusicalSettingsFrom
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.components.ProtoSliderRow
 import com.infamedavid.protoseq.ui.components.ProtoValueField
@@ -83,6 +86,7 @@ fun GinaArpPanel(
     modifier: Modifier = Modifier,
 ) {
     var editingStepIndex by remember { mutableStateOf<Int?>(null) }
+    var copiedStepSettings by remember { mutableStateOf<GinaArpStepState?>(null) }
 
     fun applyState(next: GinaArpSequencerUiState) {
         onStateChange(next.normalized())
@@ -118,7 +122,21 @@ fun GinaArpPanel(
         StepEditorDialog(
             stepIndex = editingIndex,
             step = step,
+            canPaste = copiedStepSettings != null,
             onClose = { editingStepIndex = null },
+            onCopy = {
+                copiedStepSettings = step.normalized()
+            },
+            onPaste = {
+                val copied = copiedStepSettings
+                if (copied != null) {
+                    applyState(
+                        state.updateStep(editingIndex) { current ->
+                            current.withCopiedMusicalSettingsFrom(copied)
+                        }
+                    )
+                }
+            },
             onDegreeChange = { value ->
                 applyState(state.updateStep(editingIndex) { current ->
                     current.copy(degree = value).normalized()
@@ -161,6 +179,7 @@ private fun GlobalControls(
     var keyMenuExpanded by remember { mutableStateOf(false) }
     var modeMenuExpanded by remember { mutableStateOf(false) }
     var playModeMenuExpanded by remember { mutableStateOf(false) }
+    var sequenceLengthMenuExpanded by remember { mutableStateOf(false) }
     var seedMenuExpanded by remember { mutableStateOf(false) }
     var divisorMenuExpanded by remember { mutableStateOf(false) }
     var offsetMenuExpanded by remember { mutableStateOf(false) }
@@ -185,17 +204,27 @@ private fun GlobalControls(
             modifier = Modifier.weight(1f)
         )
 
-        ProtoValueField(
-            label = "LENG",
-            value = state.sequenceLength.toString(),
-            onDecrement = {
-                onStateChange(state.copy(sequenceLength = state.sequenceLength - 1))
-            },
-            onIncrement = {
-                onStateChange(state.copy(sequenceLength = state.sequenceLength + 1))
-            },
-            modifier = Modifier.weight(1f)
-        )
+        Box(modifier = Modifier.weight(1f)) {
+            ProtoValueField(
+                label = "LENG",
+                value = state.sequenceLength.toString(),
+                onClick = { sequenceLengthMenuExpanded = true }
+            )
+            DropdownMenu(
+                expanded = sequenceLengthMenuExpanded,
+                onDismissRequest = { sequenceLengthMenuExpanded = false }
+            ) {
+                (GINA_ARP_MIN_SEQUENCE_LENGTH..GINA_ARP_MAX_SEQUENCE_LENGTH).forEach { length ->
+                    DropdownMenuItem(
+                        text = { Text(length.toString()) },
+                        onClick = {
+                            sequenceLengthMenuExpanded = false
+                            onStateChange(state.copy(sequenceLength = length))
+                        }
+                    )
+                }
+            }
+        }
 
         Box(modifier = Modifier.weight(1f)) {
             ProtoValueField(
@@ -452,7 +481,10 @@ private fun GinaArpStepGrid(
 private fun StepEditorDialog(
     stepIndex: Int,
     step: GinaArpStepState,
+    canPaste: Boolean,
     onClose: () -> Unit,
+    onCopy: () -> Unit,
+    onPaste: () -> Unit,
     onDegreeChange: (Int) -> Unit,
     onOctaveChange: (Int) -> Unit,
     onDivisionsChange: (Int) -> Unit,
@@ -566,6 +598,21 @@ private fun StepEditorDialog(
                     valueText = "${(step.ratio * 100).toInt()}%",
                     onValueChange = onRatioChange
                 )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(onClick = onCopy) {
+                        Text("COPY")
+                    }
+                    TextButton(
+                        onClick = onPaste,
+                        enabled = canPaste,
+                    ) {
+                        Text("PASTE")
+                    }
+                }
 
                 ProtoSliderRow(
                     label = "VEL",
