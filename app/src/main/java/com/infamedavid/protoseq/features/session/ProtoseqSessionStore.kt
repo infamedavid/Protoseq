@@ -28,6 +28,7 @@ import java.util.UUID
 
 private const val LEGACY_FILE_NAME = "protoseq_session_state.json"
 private const val PRESETS_FILE_NAME = "protoseq_session_presets.json"
+private const val LAST_SESSION_FILE_NAME = "protoseq_last_session.json"
 
 data class ProtoseqSessionPreset(
     val id: String,
@@ -43,8 +44,10 @@ data class ProtoseqSessionPresetSummary(
 )
 
 class ProtoseqSessionStore(
-    private val context: Context,
+    private val filesDir: File,
 ) {
+    constructor(context: Context) : this(context.filesDir)
+
     fun savePreset(name: String, sessionState: ProtoseqSessionState): Result<Unit> = runCatching {
         val presets = upsertSessionPreset(
             presets = readPresetCollectionWithLegacyMigration(),
@@ -77,15 +80,35 @@ class ProtoseqSessionStore(
 
     fun hasPresets(): Boolean = listPresets().getOrNull()?.isNotEmpty() == true
 
+    fun saveLastSession(sessionState: ProtoseqSessionState): Result<Unit> = runCatching {
+        val lastSessionFile = File(filesDir, LAST_SESSION_FILE_NAME)
+        lastSessionFile.writeText(sessionState.toJsonObject().toString())
+    }
+
+    fun loadLastSession(): Result<ProtoseqSessionState> = runCatching {
+        val lastSessionFile = File(filesDir, LAST_SESSION_FILE_NAME)
+        if (!lastSessionFile.exists()) {
+            throw IllegalStateException("Last session not found")
+        }
+        protoseqSessionStateFromJsonObject(JSONObject(lastSessionFile.readText()))
+    }
+
+    fun clearLastSession(): Result<Unit> = runCatching {
+        val lastSessionFile = File(filesDir, LAST_SESSION_FILE_NAME)
+        if (lastSessionFile.exists()) {
+            check(lastSessionFile.delete()) { "Failed to delete last session file" }
+        }
+    }
+
     private fun readPresetCollectionWithLegacyMigration(): List<ProtoseqSessionPreset> {
-        val presetsFile = File(context.filesDir, PRESETS_FILE_NAME)
+        val presetsFile = File(filesDir, PRESETS_FILE_NAME)
         if (presetsFile.exists()) {
             return runCatching {
                 protoseqSessionPresetsFromJsonObject(JSONObject(presetsFile.readText()))
             }.getOrElse { emptyList() }
         }
 
-        val legacyFile = File(context.filesDir, LEGACY_FILE_NAME)
+        val legacyFile = File(filesDir, LEGACY_FILE_NAME)
         if (!legacyFile.exists()) {
             return emptyList()
         }
@@ -109,7 +132,7 @@ class ProtoseqSessionStore(
     }
 
     private fun writePresetCollection(presets: List<ProtoseqSessionPreset>) {
-        val file = File(context.filesDir, PRESETS_FILE_NAME)
+        val file = File(filesDir, PRESETS_FILE_NAME)
         file.writeText(protoseqSessionPresetCollectionToJsonObject(presets).toString())
     }
 }
