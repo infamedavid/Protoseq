@@ -161,6 +161,34 @@ class GinaArpSequencerUiStateTest {
     }
 
     @Test
+    fun updateStepIsolationKeepsAllOtherDistinctStepsUnchanged() {
+        val steps = List(8) { index ->
+            GinaArpStepState(
+                enabled = index % 2 == 0,
+                degree = (index % 8) + 1,
+                octave = index % 9,
+                ratio = index / 7f,
+                divisions = (index % 7) + 1,
+                arpLength = ((index + 2) % 7) + 1,
+                velocity = 50 + index
+            )
+        }
+        val state = GinaArpSequencerUiState(steps = steps)
+
+        val updated = state.updateStep(3) { it.copy(degree = 8, divisions = 7, velocity = 120) }
+
+        updated.steps.forEachIndexed { index, step ->
+            if (index == 3) {
+                assertEquals(8, step.degree)
+                assertEquals(7, step.divisions)
+                assertEquals(120, step.velocity)
+            } else {
+                assertEquals(steps[index], step)
+            }
+        }
+    }
+
+    @Test
     fun updateStepWithInvalidIndexReturnsNormalizedStateWithoutCrashing() {
         val state = GinaArpSequencerUiState(sequenceLength = 0, steps = emptyList())
 
