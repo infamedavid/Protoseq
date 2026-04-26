@@ -41,8 +41,14 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
+import kotlin.io.path.createTempDirectory
 
 class ProtoseqSessionStoreTest {
+    private fun createStore(): Pair<ProtoseqSessionStore, File> {
+        val dir = createTempDirectory("protoseq-session-store-test").toFile()
+        return ProtoseqSessionStore(dir) to dir
+    }
 
     @Test
     fun sessionRoundTripPreservesEditableState() {
@@ -1223,5 +1229,57 @@ class ProtoseqSessionStoreTest {
         assertTrue(fewSnapshot.tracks.all { it.steps.size == GRID_616_MAX_STEPS })
         assertEquals(GRID_616_TRACK_COUNT, manySnapshot.tracks.size)
         assertTrue(manySnapshot.tracks.all { it.steps.size == GRID_616_MAX_STEPS })
+    }
+
+    @Test
+    fun lastSessionRoundTripPersistsWorkingSession() {
+        val (store, dir) = createStore()
+        try {
+            val session = ProtoseqSessionState(selectedPageIndex = 3)
+                .updatePage(2) { page ->
+                    page.copy(
+                        selectedSequencerType = SequencerType.GRID_616,
+                        enabled = true,
+                    )
+                }
+
+            assertTrue(store.saveLastSession(session).isSuccess)
+            val loaded = store.loadLastSession().getOrThrow()
+
+            assertEquals(session, loaded)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun loadLastSessionMissingFileFailsSafely() {
+        val (store, dir) = createStore()
+        try {
+            assertTrue(store.loadLastSession().isFailure)
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun clearLastSessionRemovesLatestSessionWithoutTouchingPresets() {
+        val (store, dir) = createStore()
+        try {
+            val workingSession = ProtoseqSessionState(selectedPageIndex = 1)
+            val presetSession = ProtoseqSessionState(selectedPageIndex = 4)
+
+            store.saveLastSession(workingSession).getOrThrow()
+            store.savePreset("Session A", presetSession).getOrThrow()
+            store.clearLastSession().getOrThrow()
+
+            assertTrue(store.loadLastSession().isFailure)
+            val presets = store.listPresets().getOrThrow()
+            assertEquals(1, presets.size)
+            val loadedPreset = store.loadPreset(presets.first().id).getOrThrow()
+            assertEquals(presetSession, loadedPreset)
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 }

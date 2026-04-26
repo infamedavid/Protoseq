@@ -37,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -71,6 +72,7 @@ import com.infamedavid.protoseq.ui.sequencers.Grid616Panel
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
+import kotlinx.coroutines.delay
 
 @Composable
 fun AppScreen() {
@@ -114,12 +116,8 @@ fun AppScreen() {
 
     var sessionState by remember {
         mutableStateOf(
-            createDefaultProtoseqSessionState().updatePage(pageIndex = 0) { page ->
-                page.copy(
-                    selectedSequencerType = SequencerType.TURING_MACHINE,
-                    enabled = true
-                )
-            }
+            sessionStore.loadLastSession()
+                .getOrElse { createDefaultProtoseqSessionState() }
         )
     }
 
@@ -183,6 +181,11 @@ fun AppScreen() {
 
     LaunchedEffect(ginaArpPageConfigs) {
         transportViewModel.updateGinaArpPageConfigs(ginaArpPageConfigs)
+    }
+
+    LaunchedEffect(sessionState) {
+        delay(300)
+        sessionStore.saveLastSession(sessionState)
     }
 
     Surface(
@@ -622,9 +625,33 @@ fun AppScreen() {
                         modifier = Modifier.size(width = 92.dp, height = 44.dp),
                         shape = ProtoControlShape,
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                        ) {
+                            Text(
+                                text = "LOAD",
+                                maxLines = 1,
+                                softWrap = false
+                            )
+                        }
+
+                    OutlinedButton(
+                        onClick = {
+                            transportViewModel.stop()
+                            sessionState = createDefaultProtoseqSessionState()
+                            showQuantizationDialog = false
+                            showRptrBasePickerDialog = false
+                            showBpmInputDialog = false
+                            showSaveStateDialog = false
+                            showLoadStateDialog = false
+                            saveDialogValidationMessage = ""
+                            sessionStore.clearLastSession()
+                            sessionStatusMessage = ""
+                        },
+                        modifier = Modifier.size(width = 72.dp, height = 44.dp),
+                        shape = ProtoControlShape,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
                     ) {
                         Text(
-                            text = "LOAD",
+                            text = "CLR",
                             maxLines = 1,
                             softWrap = false
                         )
@@ -839,7 +866,19 @@ fun AppScreen() {
                             text = "Version $appVersion\n\n" +
                                     "Protoseq is an open-source MIDI sequencer for mobile devices. " +
                                     "Its core generative behavior is inspired by the Turing Machine, " +
-                                    "the random looping sequencer by Tom Whitwell / Music Thing Modular."
+                                    "the random looping sequencer by Tom Whitwell / Music Thing Modular.\n\n" +
+                                    "GRID 616 is a flexible gate-grid sequencer designed for independent track lengths, " +
+                                    "playback modes, swing, delay, and fast pattern corruption.\n\n" +
+                                    "Gina’s ARP is a generative MIDI arpeggiator focused on the balance between repeatable " +
+                                    "randomness and hands-on control. Its original idea is credited to "
+                        )
+
+                        Text(
+                            text = "Ciudadana Cero",
+                            color = Color(0xFFFF5CA8),
+                            modifier = Modifier.clickable {
+                                uriHandler.openUri("https://www.instagram.com/ciudadana_cero/")
+                            }
                         )
 
                         Row(
