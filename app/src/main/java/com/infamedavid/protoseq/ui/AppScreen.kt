@@ -61,6 +61,7 @@ import com.infamedavid.protoseq.features.sequencer.updatePage
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
+import com.infamedavid.protoseq.features.transport.GinaArpPageConfig
 import com.infamedavid.protoseq.features.transport.Grid616PageConfig
 import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
@@ -165,6 +166,23 @@ fun AppScreen() {
 
     LaunchedEffect(grid616PageConfigs) {
         transportViewModel.updateGrid616PageConfigs(grid616PageConfigs)
+    }
+
+    val ginaArpPageConfigs = remember(sessionState.pages) {
+        sessionState.pages
+            .filter {
+                it.selectedSequencerType == SequencerType.GINAS_ARP && it.enabled
+            }
+            .map { page ->
+                GinaArpPageConfig(
+                    pageIndex = page.pageIndex,
+                    state = page.ginaArpState.normalizedGinaArp()
+                )
+            }
+    }
+
+    LaunchedEffect(ginaArpPageConfigs) {
+        transportViewModel.updateGinaArpPageConfigs(ginaArpPageConfigs)
     }
 
     Surface(
