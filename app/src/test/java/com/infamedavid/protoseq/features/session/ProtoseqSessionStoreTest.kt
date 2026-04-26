@@ -296,6 +296,7 @@ class ProtoseqSessionStoreTest {
                 octave = 5,
                 ratio = 0.8f,
                 divisions = 4,
+                arpLength = 3,
                 velocity = 92,
             )
             this[3] = GinaArpStepState(
@@ -304,6 +305,7 @@ class ProtoseqSessionStoreTest {
                 octave = 1,
                 ratio = 0.15f,
                 divisions = 7,
+                arpLength = 7,
                 velocity = 45,
             )
         }
@@ -348,6 +350,7 @@ class ProtoseqSessionStoreTest {
                 .put("octave", -5)
                 .put("ratio", 9.1)
                 .put("divisions", 999)
+                .put("arpLength", 999)
                 .put("velocity", 0)
         )
         val tooManySteps = JSONArray().apply {
@@ -359,6 +362,7 @@ class ProtoseqSessionStoreTest {
                         .put("octave", 99)
                         .put("ratio", -2.0)
                         .put("divisions", 0)
+                        .put("arpLength", 0)
                         .put("velocity", 999)
                 )
             }
@@ -408,6 +412,7 @@ class ProtoseqSessionStoreTest {
         assertEquals(8, page0State.steps.size)
         assertEquals(1f, page0State.steps[0].ratio)
         assertEquals(7, page0State.steps[0].divisions)
+        assertEquals(7, page0State.steps[0].arpLength)
         assertEquals(1, page0State.steps[0].velocity)
 
         assertEquals(GINA_ARP_MIN_SEQUENCE_LENGTH, page1State.sequenceLength)
@@ -417,7 +422,40 @@ class ProtoseqSessionStoreTest {
         assertEquals(8, page1State.steps.size)
         assertEquals(0f, page1State.steps[0].ratio)
         assertEquals(1, page1State.steps[0].divisions)
+        assertEquals(1, page1State.steps[0].arpLength)
         assertEquals(127, page1State.steps[0].velocity)
+    }
+
+    @Test
+    fun missingArpLengthFallsBackToStepDefault() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put(
+                            "ginaArpState",
+                            JSONObject().put(
+                                "steps",
+                                JSONArray().put(
+                                    JSONObject()
+                                        .put("enabled", true)
+                                        .put("degree", 1)
+                                        .put("octave", 3)
+                                        .put("ratio", 0.5)
+                                        .put("divisions", 2)
+                                        .put("velocity", 100)
+                                )
+                            )
+                        )
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        assertEquals(4, decoded.pages[0].ginaArpState.steps[0].arpLength)
     }
 
     @Test

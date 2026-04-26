@@ -29,10 +29,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_OCTAVE
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_OCTAVE
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MUTABLE_SEED
@@ -383,6 +385,13 @@ private fun StepEditorDialog(
                         onIncrement = { draft = draft.copy(divisions = draft.divisions + 1) },
                         modifier = Modifier.weight(1f)
                     )
+                    ProtoValueField(
+                        label = "ALEN",
+                        value = draft.arpLength.toString(),
+                        onDecrement = { draft = draft.copy(arpLength = draft.arpLength - 1) },
+                        onIncrement = { draft = draft.copy(arpLength = draft.arpLength + 1) },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 ProtoSliderRow(
@@ -413,6 +422,7 @@ private fun StepEditorDialog(
                             degree = draft.degree.coerceIn(GINA_ARP_MIN_DEGREE, GINA_ARP_MAX_DEGREE),
                             octave = draft.octave.coerceIn(GINA_ARP_MIN_OCTAVE, GINA_ARP_MAX_OCTAVE),
                             divisions = draft.divisions.coerceIn(GINA_ARP_MIN_STEP_DIVISIONS, GINA_ARP_MAX_STEP_DIVISIONS),
+                            arpLength = draft.arpLength.coerceIn(GINA_ARP_MIN_ARP_LENGTH, GINA_ARP_MAX_ARP_LENGTH),
                             velocity = draft.velocity.coerceIn(GINA_ARP_MIN_VELOCITY, GINA_ARP_MAX_VELOCITY),
                             ratio = draft.ratio.coerceIn(0f, 1f)
                         )

@@ -2,6 +2,7 @@ package com.infamedavid.protoseq.features.ginaarp
 
 import kotlin.random.Random
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -9,6 +10,29 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GinaArpNoteGeneratorTest {
+
+    @Test
+    fun shouldForceRootMatchesDivisionAndArpLengthRules() {
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 0, arpLength = 3))
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = -5, arpLength = 3))
+
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 0, arpLength = 3))
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 3, arpLength = 3))
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 6, arpLength = 3))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 1, arpLength = 3))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 2, arpLength = 3))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 4, arpLength = 3))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 5, arpLength = 3))
+
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 0, arpLength = 4))
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 4, arpLength = 4))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 1, arpLength = 4))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 2, arpLength = 4))
+        assertFalse(shouldGinaArpForceRoot(divisionIndex = 3, arpLength = 4))
+
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 7, arpLength = 0))
+        assertTrue(shouldGinaArpForceRoot(divisionIndex = 7, arpLength = 99))
+    }
 
     @Test
     fun scaleIntervalsMatchExpectedModes() {
@@ -101,7 +125,7 @@ class GinaArpNoteGeneratorTest {
 
     @Test
     fun mutableSeedUsesPassedRandom() {
-        val state = mutableStateForStep(0, seed = GINA_ARP_MUTABLE_SEED)
+        val state = mutableStateForStep(0, seed = GINA_ARP_MUTABLE_SEED, arpLength = 7)
         val randomA = Random(101)
         val randomB = Random(202)
 
@@ -117,8 +141,8 @@ class GinaArpNoteGeneratorTest {
 
     @Test
     fun immutableSeedIsDeterministicAndSensitiveToInputs() {
-        val seed2State = mutableStateForStep(0, seed = 2)
-        val seed3State = mutableStateForStep(0, seed = 3)
+        val seed2State = mutableStateForStep(0, seed = 2, arpLength = 7)
+        val seed3State = mutableStateForStep(0, seed = 3, arpLength = 7)
 
         val noteA = generateGinaArpNote(seed2State, stepIndex = 0, divisionIndex = 7, random = Random(1))
         val noteB = generateGinaArpNote(seed2State, stepIndex = 0, divisionIndex = 7, random = Random(999))
@@ -132,13 +156,67 @@ class GinaArpNoteGeneratorTest {
         }
         assertTrue(seed2Series != seed3Series)
 
-        val division0 = generateGinaArpNote(seed2State, stepIndex = 0, divisionIndex = 0)
         val division1 = generateGinaArpNote(seed2State, stepIndex = 0, divisionIndex = 1)
-        assertNotEquals(division0?.midiNote, division1?.midiNote)
+        val division2 = generateGinaArpNote(seed2State, stepIndex = 0, divisionIndex = 2)
+        assertNotEquals(division1?.midiNote, division2?.midiNote)
 
         val ratioChangedState = seed2State.updateStep(0) { it.copy(ratio = 0.33f) }
-        val ratioChangedNote = generateGinaArpNote(ratioChangedState, stepIndex = 0, divisionIndex = 0)
-        assertNotEquals(division0?.midiNote, ratioChangedNote?.midiNote)
+        val ratioChangedNote = generateGinaArpNote(ratioChangedState, stepIndex = 0, divisionIndex = 1)
+        assertNotEquals(division1?.midiNote, ratioChangedNote?.midiNote)
+    }
+
+    @Test
+    fun rootNoteGenerationRespectsStepStateOffsetVelocityAndClamp() {
+        val disabled = GinaArpSequencerUiState()
+        assertNull(generateGinaArpRootNote(disabled, stepIndex = 0, divisionIndex = 0))
+        assertNull(generateGinaArpRootNote(disabled, stepIndex = -1, divisionIndex = 0))
+        assertNull(generateGinaArpRootNote(disabled, stepIndex = 8, divisionIndex = 0))
+
+        val enabled = mutableStateForStep(stepIndex = 0, seed = 2).copy(globalNoteOffset = 12)
+        val root = generateGinaArpRootNote(enabled, stepIndex = 0, divisionIndex = 5)
+        val expectedRoot = resolveGinaArpStepRootMidiNote(enabled.normalized(), enabled.normalized().steps[0]) + 12
+        assertNotNull(root)
+        assertEquals(expectedRoot.coerceIn(0, 127), root!!.midiNote)
+        assertEquals(95, root.velocity)
+        assertEquals(5, root.divisionIndex)
+
+        val lowClampState = mutableStateForStep(
+            stepIndex = 0,
+            seed = 2,
+            octave = 0,
+            degree = 1,
+        ).copy(keyRootSemitone = 0, globalNoteOffset = -12)
+        assertEquals(0, generateGinaArpRootNote(lowClampState, 0, 0)!!.midiNote)
+
+        val highClampState = mutableStateForStep(
+            stepIndex = 0,
+            seed = 2,
+            octave = 8,
+            degree = 8,
+        ).copy(keyRootSemitone = 11, globalNoteOffset = 12)
+        assertEquals(127, generateGinaArpRootNote(highClampState, 0, 0)!!.midiNote)
+    }
+
+    @Test
+    fun generateNoteForcesRootOnCycleBoundariesAndBypassesRandomSelection() {
+        val state = mutableStateForStep(stepIndex = 0, seed = GINA_ARP_MUTABLE_SEED, arpLength = 3)
+        val resolvedRoot = resolveGinaArpStepRootMidiNote(state.normalized(), state.normalized().steps[0])
+
+        val division0A = generateGinaArpNote(state, 0, 0, random = Random(1))
+        val division0B = generateGinaArpNote(state, 0, 0, random = Random(999))
+        val division3A = generateGinaArpNote(state, 0, 3, random = Random(2))
+        val division3B = generateGinaArpNote(state, 0, 3, random = Random(333))
+
+        assertEquals(resolvedRoot, division0A!!.midiNote)
+        assertEquals(division0A, division0B)
+        assertEquals(resolvedRoot, division3A!!.midiNote)
+        assertEquals(division3A, division3B)
+
+        val nonRootA = generateGinaArpNote(state, 0, 1, random = Random(4))
+        val nonRootB = generateGinaArpNote(state, 0, 1, random = Random(8))
+        assertNotNull(nonRootA)
+        assertNotNull(nonRootB)
+        assertNotEquals(nonRootA, nonRootB)
     }
 
     @Test
@@ -172,13 +250,20 @@ class GinaArpNoteGeneratorTest {
         assertEquals((base.midiNote - 12).coerceIn(0, 127), down!!.midiNote)
     }
 
-    private fun mutableStateForStep(stepIndex: Int, seed: Int): GinaArpSequencerUiState {
+    private fun mutableStateForStep(
+        stepIndex: Int,
+        seed: Int,
+        arpLength: Int = 4,
+        octave: Int = 4,
+        degree: Int = 1,
+    ): GinaArpSequencerUiState {
         val steps = List(GINA_ARP_STEP_COUNT) { GinaArpStepState() }.toMutableList()
         steps[stepIndex] = GinaArpStepState(
             enabled = true,
-            degree = 1,
-            octave = 4,
+            degree = degree,
+            octave = octave,
             ratio = 1f,
+            arpLength = arpLength,
             velocity = 95,
         )
 

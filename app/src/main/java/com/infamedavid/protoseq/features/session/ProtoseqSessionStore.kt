@@ -412,6 +412,7 @@ private fun GinaArpStepState.toJsonObject(): JSONObject = JSONObject()
     .put("octave", octave)
     .put("ratio", ratio)
     .put("divisions", divisions)
+    .put("arpLength", arpLength)
     .put("velocity", velocity)
 
 private fun grid616SequencerUiStateFromJsonObject(
@@ -626,6 +627,7 @@ private fun ginaArpStepFromJsonObject(
         octave = json.optInt("octave", defaultStep.octave),
         ratio = json.optDouble("ratio", defaultStep.ratio.toDouble()).toFloat(),
         divisions = json.optInt("divisions", defaultStep.divisions),
+        arpLength = json.optInt("arpLength", defaultStep.arpLength),
         velocity = json.optInt("velocity", defaultStep.velocity),
     ).normalized()
 }

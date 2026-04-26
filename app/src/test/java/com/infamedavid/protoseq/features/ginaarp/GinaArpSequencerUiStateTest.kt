@@ -21,6 +21,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(0.5f, state.gateLength)
         assertEquals(0f, state.randomGateLength)
         assertEquals(1f, state.bernoulliGate)
+        assertEquals(4, state.steps.first().arpLength)
     }
 
     @Test
@@ -30,6 +31,7 @@ class GinaArpSequencerUiStateTest {
             octave = -1,
             ratio = -0.1f,
             divisions = 0,
+            arpLength = 0,
             velocity = 0,
         ).normalized()
 
@@ -37,6 +39,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(0, low.octave)
         assertEquals(0f, low.ratio)
         assertEquals(1, low.divisions)
+        assertEquals(1, low.arpLength)
         assertEquals(1, low.velocity)
 
         val high = GinaArpStepState(
@@ -44,6 +47,7 @@ class GinaArpSequencerUiStateTest {
             octave = 9,
             ratio = 1.1f,
             divisions = 8,
+            arpLength = 8,
             velocity = 128,
         ).normalized()
 
@@ -51,6 +55,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(8, high.octave)
         assertEquals(1f, high.ratio)
         assertEquals(7, high.divisions)
+        assertEquals(7, high.arpLength)
         assertEquals(127, high.velocity)
     }
 
@@ -118,6 +123,7 @@ class GinaArpSequencerUiStateTest {
         assertEquals(8, fewer.steps[0].octave)
         assertEquals(0f, fewer.steps[0].ratio)
         assertEquals(7, fewer.steps[0].divisions)
+        assertEquals(4, fewer.steps[0].arpLength)
         assertEquals(1, fewer.steps[0].velocity)
         assertEquals(GinaArpStepState(), fewer.steps.last())
 
