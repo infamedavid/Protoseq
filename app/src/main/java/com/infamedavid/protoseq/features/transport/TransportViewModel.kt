@@ -153,11 +153,10 @@ class TransportViewModel(
                             runtime.lastProcessedStepTick = null
                         }
                         ginaArpPageRuntimes.values.forEach { runtime ->
-                            clearGinaArpScheduledEvents(runtime)
-                            runtime.currentStepIndex = runtime.currentStepIndex.coerceAtLeast(0)
-                            runtime.currentDivisionIndex = runtime.currentDivisionIndex.coerceAtLeast(0)
-                            runtime.direction = 1
-                            runtime.nextGateTick = 1L
+                            resetGinaArpRuntimeForTransportStart(
+                                runtime = runtime,
+                                state = activeGinaArpPageConfigs[runtime.pageIndex]
+                            )
                         }
                         syncRptrUiState()
                         clockEngine.playFromStart()
@@ -790,6 +789,24 @@ class TransportViewModel(
 
     private fun clearGinaArpScheduledEvents(runtime: GinaArpPageRuntime) {
         runtime.scheduledNoteOffs.clear()
+    }
+
+    private fun resetGinaArpRuntimeForTransportStart(
+        runtime: GinaArpPageRuntime,
+        state: GinaArpSequencerUiState?
+    ) {
+        val normalizedState = state?.normalized()
+        val sequenceLength = normalizedState?.sequenceLength?.coerceAtLeast(1) ?: 1
+        val reverseStart = normalizedState?.playMode == GinaArpPlayMode.REVERSE
+        runtime.currentStepIndex = if (reverseStart) {
+            sequenceLength - 1
+        } else {
+            0
+        }
+        runtime.direction = if (reverseStart) -1 else 1
+        runtime.currentDivisionIndex = 0
+        runtime.nextGateTick = 1L
+        clearGinaArpScheduledEvents(runtime)
     }
 
     private fun clearGinaArpPageRuntimeLocked(pageIndex: Int) {
