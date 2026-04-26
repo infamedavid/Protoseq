@@ -29,14 +29,17 @@ import androidx.compose.ui.unit.dp
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_OCTAVE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_ARP_LENGTH
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_NOTE_OFFSET
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_TEMPO_DIVISOR
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MAX_VELOCITY
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_ARP_LENGTH
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_DEGREE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_OCTAVE
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_MIDI_CHANNEL
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_NOTE_OFFSET
+import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_STEP_DIVISIONS
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_TEMPO_DIVISOR
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MIN_VELOCITY
 import com.infamedavid.protoseq.features.ginaarp.GINA_ARP_MUTABLE_SEED
@@ -457,6 +460,11 @@ private fun StepEditorDialog(
     onRatioChange: (Float) -> Unit,
     onVelocityChange: (Int) -> Unit,
 ) {
+    var degreeMenuExpanded by remember { mutableStateOf(false) }
+    var octaveMenuExpanded by remember { mutableStateOf(false) }
+    var divisionsMenuExpanded by remember { mutableStateOf(false) }
+    var arpLengthMenuExpanded by remember { mutableStateOf(false) }
+
     AlertDialog(
         onDismissRequest = onClose,
         title = { Text("Step ${stepIndex + 1}") },
@@ -466,34 +474,90 @@ private fun StepEditorDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    ProtoValueField(
-                        label = "DEG",
-                        value = step.degree.toString(),
-                        onDecrement = { onDegreeChange(step.degree - 1) },
-                        onIncrement = { onDegreeChange(step.degree + 1) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ProtoValueField(
-                        label = "OCT",
-                        value = step.octave.toString(),
-                        onDecrement = { onOctaveChange(step.octave - 1) },
-                        onIncrement = { onOctaveChange(step.octave + 1) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ProtoValueField(
-                        label = "SLEN",
-                        value = step.divisions.toString(),
-                        onDecrement = { onDivisionsChange(step.divisions - 1) },
-                        onIncrement = { onDivisionsChange(step.divisions + 1) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ProtoValueField(
-                        label = "ALEN",
-                        value = step.arpLength.toString(),
-                        onDecrement = { onArpLengthChange(step.arpLength - 1) },
-                        onIncrement = { onArpLengthChange(step.arpLength + 1) },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        ProtoValueField(
+                            label = "DEG",
+                            value = step.degree.toString(),
+                            onClick = { degreeMenuExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = degreeMenuExpanded,
+                            onDismissRequest = { degreeMenuExpanded = false }
+                        ) {
+                            (GINA_ARP_MIN_DEGREE..GINA_ARP_MAX_DEGREE).forEach { degree ->
+                                DropdownMenuItem(
+                                    text = { Text(degree.toString()) },
+                                    onClick = {
+                                        degreeMenuExpanded = false
+                                        onDegreeChange(degree)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ProtoValueField(
+                            label = "OCT",
+                            value = step.octave.toString(),
+                            onClick = { octaveMenuExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = octaveMenuExpanded,
+                            onDismissRequest = { octaveMenuExpanded = false }
+                        ) {
+                            (GINA_ARP_MIN_OCTAVE..GINA_ARP_MAX_OCTAVE).forEach { octave ->
+                                DropdownMenuItem(
+                                    text = { Text(octave.toString()) },
+                                    onClick = {
+                                        octaveMenuExpanded = false
+                                        onOctaveChange(octave)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ProtoValueField(
+                            label = "SLEN",
+                            value = step.divisions.toString(),
+                            onClick = { divisionsMenuExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = divisionsMenuExpanded,
+                            onDismissRequest = { divisionsMenuExpanded = false }
+                        ) {
+                            (GINA_ARP_MIN_STEP_DIVISIONS..GINA_ARP_MAX_STEP_DIVISIONS).forEach { divisions ->
+                                DropdownMenuItem(
+                                    text = { Text(divisions.toString()) },
+                                    onClick = {
+                                        divisionsMenuExpanded = false
+                                        onDivisionsChange(divisions)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        ProtoValueField(
+                            label = "ALEN",
+                            value = step.arpLength.toString(),
+                            onClick = { arpLengthMenuExpanded = true }
+                        )
+                        DropdownMenu(
+                            expanded = arpLengthMenuExpanded,
+                            onDismissRequest = { arpLengthMenuExpanded = false }
+                        ) {
+                            (GINA_ARP_MIN_ARP_LENGTH..GINA_ARP_MAX_ARP_LENGTH).forEach { arpLength ->
+                                DropdownMenuItem(
+                                    text = { Text(arpLength.toString()) },
+                                    onClick = {
+                                        arpLengthMenuExpanded = false
+                                        onArpLengthChange(arpLength)
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 ProtoSliderRow(
