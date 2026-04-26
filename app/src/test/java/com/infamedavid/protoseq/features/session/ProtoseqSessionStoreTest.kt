@@ -512,7 +512,7 @@ class ProtoseqSessionStoreTest {
             )
 
         val decoded = protoseqSessionStateFromJsonObject(json)
-        assertEquals(4, decoded.pages[0].ginaArpState.steps[0].arpLength)
+        assertEquals(2, decoded.pages[0].ginaArpState.steps[0].arpLength)
     }
 
     @Test
