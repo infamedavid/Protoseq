@@ -23,6 +23,11 @@ import com.infamedavid.protoseq.features.grid616.GRID_616_MAX_FINAL_DELAY_TICKS
 import com.infamedavid.protoseq.features.grid616.GRID_616_TICKS_PER_STEP
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerConfig
 import com.infamedavid.protoseq.features.grid616.resolveGrid616StepIndex
+import com.infamedavid.protoseq.features.ginaarp.GinaArpPlayMode
+import com.infamedavid.protoseq.features.ginaarp.GinaArpSequencerUiState
+import com.infamedavid.protoseq.features.ginaarp.GinaArpStepState
+import com.infamedavid.protoseq.features.ginaarp.generateGinaArpNote
+import com.infamedavid.protoseq.features.ginaarp.normalized
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
@@ -37,6 +42,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -51,8 +57,10 @@ class TransportViewModel(
     private val runtimeMutex = Mutex()
     private val activeTuringPageConfigs = mutableMapOf<Int, StochasticSequencerConfig>()
     private val activeGrid616PageConfigs = mutableMapOf<Int, Grid616SequencerConfig>()
+    private val activeGinaArpPageConfigs = mutableMapOf<Int, GinaArpSequencerUiState>()
     private val pageRuntimes = mutableMapOf<Int, PageRuntime>()
     private val grid616PageRuntimes = mutableMapOf<Int, Grid616PageRuntime>()
+    private val ginaArpPageRuntimes = mutableMapOf<Int, GinaArpPageRuntime>()
     private val activeMidiNotes = ActiveMidiNoteRegistry()
     private var latestClockTick: Long = 1L
 
@@ -93,6 +101,7 @@ class TransportViewModel(
                         processCcSlewTick(runtime, config)
                     }
                     processGrid616TickLocked(tick)
+                    processGinaArpTickLocked(tick)
                     syncRptrUiState()
                 }
                 if (tick % 4L == 0L) {
@@ -143,6 +152,12 @@ class TransportViewModel(
                             runtime.globalStepCounter = 0L
                             runtime.lastProcessedStepTick = null
                         }
+                        ginaArpPageRuntimes.values.forEach { runtime ->
+                            resetGinaArpRuntimeForTransportStart(
+                                runtime = runtime,
+                                state = activeGinaArpPageConfigs[runtime.pageIndex]
+                            )
+                        }
                         syncRptrUiState()
                         clockEngine.playFromStart()
                         midiEngine.sendStart()
@@ -172,6 +187,7 @@ class TransportViewModel(
                             clearCcSlewState(runtime)
                         }
                         resetAllGrid616RuntimesLocked()
+                        pauseAllGinaArpRuntimesLocked()
                         releaseAllNotesLocked()
                         syncRptrUiState()
                         clockEngine.stop()
@@ -194,6 +210,7 @@ class TransportViewModel(
                         sendAndClearPendingNoteOffs(runtime)
                     }
                     pauseAllGrid616RuntimesLocked()
+                    pauseAllGinaArpRuntimesLocked()
                     syncRptrUiState()
                     clockEngine.pause()
                 }
@@ -227,8 +244,10 @@ class TransportViewModel(
             runtimeMutex.withLock {
                 activeTuringPageConfigs.remove(pageIndex)
                 activeGrid616PageConfigs.remove(pageIndex)
+                activeGinaArpPageConfigs.remove(pageIndex)
                 clearPageRuntimeLocked(pageIndex)
                 clearGrid616PageRuntimeLocked(pageIndex)
+                clearGinaArpPageRuntimeLocked(pageIndex)
                 syncRptrUiState()
             }
         }
@@ -247,6 +266,25 @@ class TransportViewModel(
                 nextConfigsByPage.forEach { (pageIndex, nextConfig) ->
                     activeGrid616PageConfigs[pageIndex] = nextConfig
                     grid616PageRuntimes.getOrPut(pageIndex) { Grid616PageRuntime(pageIndex = pageIndex) }
+                }
+            }
+        }
+    }
+
+    fun updateGinaArpPageConfigs(configs: List<GinaArpPageConfig>) {
+        vmScope.launch {
+            runtimeMutex.withLock {
+                val nextConfigsByPage = configs.associate { it.pageIndex to it.state.normalized() }
+                val removedPageIndexes = activeGinaArpPageConfigs.keys - nextConfigsByPage.keys
+                removedPageIndexes.forEach { pageIndex ->
+                    activeGinaArpPageConfigs.remove(pageIndex)
+                    clearGinaArpPageRuntimeLocked(pageIndex)
+                }
+
+                nextConfigsByPage.forEach { (pageIndex, nextState) ->
+                    activeGinaArpPageConfigs[pageIndex] = nextState
+                    val runtime = ginaArpPageRuntimes.getOrPut(pageIndex) { GinaArpPageRuntime(pageIndex = pageIndex) }
+                    clampGinaArpRuntimePosition(runtime, nextState)
                 }
             }
         }
@@ -420,6 +458,145 @@ class TransportViewModel(
                 iterator.remove()
             }
         }
+    }
+
+    private fun processGinaArpTickLocked(currentTick: Long) {
+        ginaArpPageRuntimes.forEach { (pageIndex, runtime) ->
+            val state = activeGinaArpPageConfigs[pageIndex] ?: return@forEach
+            clampGinaArpRuntimePosition(runtime, state)
+            processDueGinaArpNoteOffsLocked(pageIndex, runtime, currentTick)
+            if (currentTick < runtime.nextGateTick) return@forEach
+
+            val step = state.steps[runtime.currentStepIndex]
+            val shouldPassBernoulli = when {
+                state.bernoulliGate <= 0f -> false
+                state.bernoulliGate >= 1f -> true
+                else -> runtime.random.nextFloat() < state.bernoulliGate
+            }
+
+            if (shouldPassBernoulli) {
+                val generated = generateGinaArpNote(
+                    state = state,
+                    stepIndex = runtime.currentStepIndex,
+                    divisionIndex = runtime.currentDivisionIndex,
+                    random = runtime.random
+                )
+                if (generated != null) {
+                    val channel = 1
+                    sendPageNoteOnLocked(
+                        pageIndex = pageIndex,
+                        channel = channel,
+                        note = generated.midiNote,
+                        velocity = generated.velocity
+                    )
+                    val gateTicks = calculateGinaArpGateTicks(state, runtime)
+                    runtime.scheduledNoteOffs += GinaArpScheduledNoteOff(
+                        dueTick = currentTick + gateTicks,
+                        channel = channel,
+                        note = generated.midiNote
+                    )
+                }
+            }
+
+            advanceGinaArpPosition(runtime, state, step)
+            val ticksPerGeneratedGate = (TICKS_PER_STEP * state.tempoDivisor.toLong()).coerceAtLeast(1L)
+            runtime.nextGateTick = currentTick + ticksPerGeneratedGate
+        }
+    }
+
+    private fun processDueGinaArpNoteOffsLocked(
+        pageIndex: Int,
+        runtime: GinaArpPageRuntime,
+        currentTick: Long
+    ) {
+        val iterator = runtime.scheduledNoteOffs.iterator()
+        while (iterator.hasNext()) {
+            val scheduled = iterator.next()
+            if (scheduled.dueTick <= currentTick) {
+                releasePageNoteLocked(pageIndex, scheduled.channel, scheduled.note)
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun calculateGinaArpGateTicks(
+        state: GinaArpSequencerUiState,
+        runtime: GinaArpPageRuntime
+    ): Long {
+        val ticksPerGeneratedGate = (TICKS_PER_STEP * state.tempoDivisor.toLong()).coerceAtLeast(1L)
+        val baseGateTicks = max(1, (ticksPerGeneratedGate.toFloat() * state.gateLength).roundToInt())
+        val maxExtraTicks = if (state.randomGateLength <= 0f) {
+            0
+        } else {
+            (ticksPerGeneratedGate.toFloat() * state.randomGateLength).roundToInt().coerceAtLeast(0)
+        }
+        val randomExtraTicks = if (maxExtraTicks <= 0) 0 else runtime.random.nextInt(maxExtraTicks + 1)
+        val unclamped = baseGateTicks + randomExtraTicks
+        val maxGateTicks = (ticksPerGeneratedGate - 1L).coerceAtLeast(1L).toInt()
+        return unclamped.coerceIn(1, maxGateTicks).toLong()
+    }
+
+    private fun advanceGinaArpPosition(
+        runtime: GinaArpPageRuntime,
+        state: GinaArpSequencerUiState,
+        currentStep: GinaArpStepState
+    ) {
+        val divisions = currentStep.divisions.coerceAtLeast(1)
+        runtime.currentDivisionIndex += 1
+        if (runtime.currentDivisionIndex < divisions) {
+            return
+        }
+        runtime.currentDivisionIndex = 0
+        val (nextStepIndex, nextDirection) = nextGinaArpStepIndex(
+            currentStepIndex = runtime.currentStepIndex,
+            sequenceLength = state.sequenceLength,
+            playMode = state.playMode,
+            direction = runtime.direction,
+            random = runtime.random
+        )
+        runtime.currentStepIndex = nextStepIndex
+        runtime.direction = nextDirection
+    }
+
+    private fun nextGinaArpStepIndex(
+        currentStepIndex: Int,
+        sequenceLength: Int,
+        playMode: GinaArpPlayMode,
+        direction: Int,
+        random: Random
+    ): Pair<Int, Int> {
+        val length = sequenceLength.coerceAtLeast(1)
+        if (length <= 1) return 0 to 1
+        return when (playMode) {
+            GinaArpPlayMode.FORWARD -> ((currentStepIndex + 1) % length) to 1
+            GinaArpPlayMode.REVERSE -> ((currentStepIndex - 1 + length) % length) to -1
+            GinaArpPlayMode.RANDOM -> random.nextInt(until = length) to 1
+            GinaArpPlayMode.PING_PONG -> {
+                val currentDirection = if (direction >= 0) 1 else -1
+                var nextIndex = currentStepIndex + currentDirection
+                var nextDirection = currentDirection
+                if (nextIndex >= length) {
+                    nextDirection = -1
+                    nextIndex = (length - 2).coerceAtLeast(0)
+                } else if (nextIndex < 0) {
+                    nextDirection = 1
+                    nextIndex = 1.coerceAtMost(length - 1)
+                }
+                nextIndex to nextDirection
+            }
+        }
+    }
+
+    private fun clampGinaArpRuntimePosition(runtime: GinaArpPageRuntime, state: GinaArpSequencerUiState) {
+        val length = state.sequenceLength.coerceAtLeast(1)
+        runtime.currentStepIndex = runtime.currentStepIndex.coerceIn(0, length - 1)
+        val stepDivisions = state.steps
+            .getOrNull(runtime.currentStepIndex)
+            ?.divisions
+            ?.coerceAtLeast(1)
+            ?: 1
+        runtime.currentDivisionIndex = runtime.currentDivisionIndex.coerceIn(0, stepDivisions - 1)
+        runtime.direction = if (runtime.direction >= 0) 1 else -1
     }
 
     private fun advanceSequencer(
@@ -610,6 +787,35 @@ class TransportViewModel(
         }
     }
 
+    private fun clearGinaArpScheduledEvents(runtime: GinaArpPageRuntime) {
+        runtime.scheduledNoteOffs.clear()
+    }
+
+    private fun resetGinaArpRuntimeForTransportStart(
+        runtime: GinaArpPageRuntime,
+        state: GinaArpSequencerUiState?
+    ) {
+        val normalizedState = state?.normalized()
+        val sequenceLength = normalizedState?.sequenceLength?.coerceAtLeast(1) ?: 1
+        val reverseStart = normalizedState?.playMode == GinaArpPlayMode.REVERSE
+        runtime.currentStepIndex = if (reverseStart) {
+            sequenceLength - 1
+        } else {
+            0
+        }
+        runtime.direction = if (reverseStart) -1 else 1
+        runtime.currentDivisionIndex = 0
+        runtime.nextGateTick = 1L
+        clearGinaArpScheduledEvents(runtime)
+    }
+
+    private fun clearGinaArpPageRuntimeLocked(pageIndex: Int) {
+        ginaArpPageRuntimes.remove(pageIndex)?.let { runtime ->
+            clearGinaArpScheduledEvents(runtime)
+            releasePageNotesLocked(pageIndex)
+        }
+    }
+
     private fun resetAllGrid616RuntimesLocked() {
         grid616PageRuntimes.values.forEach { runtime ->
             clearGrid616ScheduledEvents(runtime)
@@ -627,6 +833,14 @@ class TransportViewModel(
         grid616PageRuntimes.keys.toList().forEach { pageIndex ->
             val runtime = grid616PageRuntimes[pageIndex] ?: return@forEach
             clearGrid616ScheduledEvents(runtime)
+            releasePageNotesLocked(pageIndex)
+        }
+    }
+
+    private fun pauseAllGinaArpRuntimesLocked() {
+        ginaArpPageRuntimes.keys.toList().forEach { pageIndex ->
+            val runtime = ginaArpPageRuntimes[pageIndex] ?: return@forEach
+            clearGinaArpScheduledEvents(runtime)
             releasePageNotesLocked(pageIndex)
         }
     }
@@ -662,6 +876,7 @@ class TransportViewModel(
                     sendAndClearPendingNoteOffs(runtime)
                 }
                 clearAllGrid616RuntimesLocked()
+                ginaArpPageRuntimes.keys.toList().forEach(::clearGinaArpPageRuntimeLocked)
                 releaseAllNotesLocked()
                 syncRptrUiState()
             }
@@ -732,6 +947,22 @@ class TransportViewModel(
         val scheduledNoteOffs: MutableList<Grid616ScheduledNoteOff> = mutableListOf()
     )
 
+    private data class GinaArpScheduledNoteOff(
+        val dueTick: Long,
+        val channel: Int,
+        val note: Int
+    )
+
+    private data class GinaArpPageRuntime(
+        val pageIndex: Int,
+        var currentStepIndex: Int = 0,
+        var currentDivisionIndex: Int = 0,
+        var direction: Int = 1,
+        var nextGateTick: Long = 1L,
+        val scheduledNoteOffs: MutableList<GinaArpScheduledNoteOff> = mutableListOf(),
+        val random: Random = Random.Default
+    )
+
     private data class PageRuntime(
         val pageIndex: Int,
         val sequencerEngine: StochasticSequencerEngine = StochasticSequencerEngine(),
@@ -750,4 +981,9 @@ data class TuringPageConfig(
 data class Grid616PageConfig(
     val pageIndex: Int,
     val config: Grid616SequencerConfig
+)
+
+data class GinaArpPageConfig(
+    val pageIndex: Int,
+    val state: GinaArpSequencerUiState
 )

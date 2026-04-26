@@ -47,6 +47,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.infamedavid.protoseq.R
 import com.infamedavid.protoseq.core.music.QuantizationMode
 import com.infamedavid.protoseq.features.session.ProtoseqSessionPresetSummary
+import com.infamedavid.protoseq.features.ginaarp.GinaArpSequencerUiState
+import com.infamedavid.protoseq.features.ginaarp.normalized as normalizedGinaArp
 import com.infamedavid.protoseq.features.grid616.Grid616SequencerUiState
 import com.infamedavid.protoseq.features.grid616.normalized
 import com.infamedavid.protoseq.features.grid616.toConfig as toGrid616Config
@@ -59,10 +61,12 @@ import com.infamedavid.protoseq.features.sequencer.updatePage
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
+import com.infamedavid.protoseq.features.transport.GinaArpPageConfig
 import com.infamedavid.protoseq.features.transport.Grid616PageConfig
 import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
+import com.infamedavid.protoseq.ui.sequencers.GinaArpPanel
 import com.infamedavid.protoseq.ui.sequencers.Grid616Panel
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
@@ -162,6 +166,23 @@ fun AppScreen() {
 
     LaunchedEffect(grid616PageConfigs) {
         transportViewModel.updateGrid616PageConfigs(grid616PageConfigs)
+    }
+
+    val ginaArpPageConfigs = remember(sessionState.pages) {
+        sessionState.pages
+            .filter {
+                it.selectedSequencerType == SequencerType.GINAS_ARP && it.enabled
+            }
+            .map { page ->
+                GinaArpPageConfig(
+                    pageIndex = page.pageIndex,
+                    state = page.ginaArpState.normalizedGinaArp()
+                )
+            }
+    }
+
+    LaunchedEffect(ginaArpPageConfigs) {
+        transportViewModel.updateGinaArpPageConfigs(ginaArpPageConfigs)
     }
 
     Surface(
@@ -344,6 +365,9 @@ fun AppScreen() {
                                     crptState = page.grid616State.crptState
                                 ).normalized()
                             )
+                            SequencerType.GINAS_ARP -> page.copy(
+                                ginaArpState = GinaArpSequencerUiState()
+                            )
                             SequencerType.EMPTY -> page
                         }
                     }
@@ -515,6 +539,20 @@ fun AppScreen() {
                         },
                         onBeforeCrptSet = {
                             transportViewModel.prepareGrid616PageForPatternReplace(currentPage.pageIndex)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp)
+                    )
+                }
+
+                SequencerType.GINAS_ARP -> {
+                    GinaArpPanel(
+                        state = currentPage.ginaArpState,
+                        onStateChange = { next ->
+                            sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                                page.copy(ginaArpState = next.normalizedGinaArp())
+                            }
                         },
                         modifier = Modifier
                             .fillMaxWidth()
