@@ -20,6 +20,10 @@ import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.PROTOSEQ_SESSION_STATE_VERSION
 import com.infamedavid.protoseq.features.sequencer.ProtoseqSessionState
 import com.infamedavid.protoseq.features.sequencer.SequencerPageState
+import com.infamedavid.protoseq.features.stp116.Stp116PlaybackMode
+import com.infamedavid.protoseq.features.stp116.Stp116SequencerUiState
+import com.infamedavid.protoseq.features.stp116.Stp116StepState
+import com.infamedavid.protoseq.features.stp116.normalized
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import org.json.JSONArray
 import org.json.JSONObject
@@ -220,6 +224,7 @@ fun ProtoseqSessionState.toJsonObject(): JSONObject {
                 .put("turingState", page.turingState.toJsonObject())
                 .put("grid616State", page.grid616State.toJsonObject())
                 .put("ginaArpState", page.ginaArpState.toJsonObject())
+                .put("stp116State", page.stp116State.toJsonObject())
         )
     }
 
@@ -259,6 +264,10 @@ fun protoseqSessionStateFromJsonObject(json: JSONObject): ProtoseqSessionState {
             ginaArpState = ginaArpStateFromJsonObject(
                 pageJson.optJSONObject("ginaArpState"),
                 defaultPage.ginaArpState,
+            ),
+            stp116State = stp116SequencerUiStateFromJsonObject(
+                pageJson.optJSONObject("stp116State"),
+                defaultPage.stp116State,
             ),
         )
 
@@ -437,6 +446,32 @@ private fun GinaArpStepState.toJsonObject(): JSONObject = JSONObject()
     .put("ratio", ratio)
     .put("divisions", divisions)
     .put("arpLength", arpLength)
+    .put("velocity", velocity)
+
+private fun Stp116SequencerUiState.toJsonObject(): JSONObject = JSONObject()
+    .put("midiChannel", midiChannel)
+    .put("sequenceLength", sequenceLength)
+    .put("clockDivider", clockDivider)
+    .put("playbackMode", playbackMode.name)
+    .put("bernoulliDropChance", bernoulliDropChance)
+    .put("randomGateLengthAmount", randomGateLengthAmount)
+    .put("randomVelocityAmount", randomVelocityAmount)
+    .put(
+        "steps",
+        JSONArray().apply {
+            steps.forEach { step ->
+                put(step.toJsonObject())
+            }
+        }
+    )
+
+private fun Stp116StepState.toJsonObject(): JSONObject = JSONObject()
+    .put("enabled", enabled)
+    .put("pitchClass", pitchClass)
+    .put("octave", octave)
+    .put("fineTuneCents", fineTuneCents)
+    .put("gateDelayTicks", gateDelayTicks)
+    .put("gateLengthTicks", gateLengthTicks)
     .put("velocity", velocity)
 
 private fun grid616SequencerUiStateFromJsonObject(
@@ -638,6 +673,59 @@ private fun ginaArpStateFromJsonObject(
             .toFloat(),
         bernoulliGate = json.optDouble("bernoulliGate", defaultState.bernoulliGate.toDouble()).toFloat(),
         steps = steps,
+    ).normalized()
+}
+
+private fun stp116SequencerUiStateFromJsonObject(
+    json: JSONObject?,
+    defaultState: Stp116SequencerUiState = Stp116SequencerUiState(),
+): Stp116SequencerUiState {
+    if (json == null) return defaultState.normalized()
+
+    val steps = (json.optJSONArray("steps") ?: JSONArray()).let { stepsJson ->
+        buildList {
+            for (i in 0 until stepsJson.length()) {
+                val stepJson = stepsJson.optJSONObject(i)
+                add(stp116StepStateFromJsonObject(stepJson, Stp116StepState()))
+            }
+        }
+    }
+
+    return defaultState.copy(
+        midiChannel = json.optInt("midiChannel", defaultState.midiChannel),
+        sequenceLength = json.optInt("sequenceLength", defaultState.sequenceLength),
+        clockDivider = json.optInt("clockDivider", defaultState.clockDivider),
+        playbackMode = enumValueOrDefault(
+            rawName = json.optString("playbackMode", defaultState.playbackMode.name),
+            default = Stp116PlaybackMode.FORWARD,
+        ),
+        bernoulliDropChance = json
+            .optDouble("bernoulliDropChance", defaultState.bernoulliDropChance.toDouble())
+            .toFloat(),
+        randomGateLengthAmount = json
+            .optDouble("randomGateLengthAmount", defaultState.randomGateLengthAmount.toDouble())
+            .toFloat(),
+        randomVelocityAmount = json
+            .optDouble("randomVelocityAmount", defaultState.randomVelocityAmount.toDouble())
+            .toFloat(),
+        steps = steps,
+    ).normalized()
+}
+
+private fun stp116StepStateFromJsonObject(
+    json: JSONObject?,
+    defaultStep: Stp116StepState = Stp116StepState(),
+): Stp116StepState {
+    if (json == null) return defaultStep.normalized()
+
+    return defaultStep.copy(
+        enabled = json.optBoolean("enabled", defaultStep.enabled),
+        pitchClass = json.optInt("pitchClass", defaultStep.pitchClass),
+        octave = json.optInt("octave", defaultStep.octave),
+        fineTuneCents = json.optInt("fineTuneCents", defaultStep.fineTuneCents),
+        gateDelayTicks = json.optInt("gateDelayTicks", defaultStep.gateDelayTicks),
+        gateLengthTicks = json.optInt("gateLengthTicks", defaultStep.gateLengthTicks),
+        velocity = json.optInt("velocity", defaultStep.velocity),
     ).normalized()
 }
 

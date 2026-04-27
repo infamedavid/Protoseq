@@ -59,6 +59,8 @@ import com.infamedavid.protoseq.features.sequencer.createDefaultProtoseqSessionS
 import com.infamedavid.protoseq.features.sequencer.currentPage
 import com.infamedavid.protoseq.features.sequencer.selectPage
 import com.infamedavid.protoseq.features.sequencer.updatePage
+import com.infamedavid.protoseq.features.stp116.Stp116SequencerUiState
+import com.infamedavid.protoseq.features.stp116.normalized as normalizedStp116
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
@@ -371,6 +373,9 @@ fun AppScreen() {
                             SequencerType.GINAS_ARP -> page.copy(
                                 ginaArpState = GinaArpSequencerUiState()
                             )
+                            SequencerType.STP_116 -> page.copy(
+                                stp116State = Stp116SequencerUiState().normalizedStp116()
+                            )
                             SequencerType.EMPTY -> page
                         }
                     }
@@ -561,6 +566,26 @@ fun AppScreen() {
                             .fillMaxWidth()
                             .padding(vertical = 12.dp)
                     )
+                }
+
+                SequencerType.STP_116 -> {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "STP 116",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "16-step melodic sequencer. UI coming next.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             }
 
@@ -1000,6 +1025,7 @@ private fun SelectedSlotHeader(
                         }
                     )
                 }
+
             }
         }
 

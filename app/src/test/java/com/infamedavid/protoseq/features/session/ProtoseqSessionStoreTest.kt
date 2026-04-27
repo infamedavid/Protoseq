@@ -32,6 +32,10 @@ import com.infamedavid.protoseq.features.sequencer.DEFAULT_PROTOSEQ_PAGE_COUNT
 import com.infamedavid.protoseq.features.sequencer.ProtoseqSessionState
 import com.infamedavid.protoseq.features.sequencer.SequencerType
 import com.infamedavid.protoseq.features.sequencer.updatePage
+import com.infamedavid.protoseq.features.stp116.Stp116PlaybackMode
+import com.infamedavid.protoseq.features.stp116.Stp116SequencerUiState
+import com.infamedavid.protoseq.features.stp116.Stp116StepState
+import com.infamedavid.protoseq.features.stp116.normalized as normalizedStp116
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import org.json.JSONArray
 import org.json.JSONObject
@@ -96,6 +100,22 @@ class ProtoseqSessionStoreTest {
         val decoded = protoseqSessionStateFromJsonObject(input.toJsonObject())
 
         assertEquals(SequencerType.GINAS_ARP, decoded.pages[0].selectedSequencerType)
+        assertTrue(decoded.pages[0].enabled)
+    }
+
+    @Test
+    fun sessionRoundTripPreservesStp116SequencerType() {
+        val input = ProtoseqSessionState()
+            .updatePage(0) { page ->
+                page.copy(
+                    selectedSequencerType = SequencerType.STP_116,
+                    enabled = true,
+                )
+            }
+
+        val decoded = protoseqSessionStateFromJsonObject(input.toJsonObject())
+
+        assertEquals(SequencerType.STP_116, decoded.pages[0].selectedSequencerType)
         assertTrue(decoded.pages[0].enabled)
     }
 
@@ -238,10 +258,16 @@ class ProtoseqSessionStoreTest {
         assertTrue(serialized.contains("\"turingState\""))
         assertTrue(serialized.contains("\"grid616State\""))
         assertTrue(serialized.contains("\"ginaArpState\""))
+        assertTrue(serialized.contains("\"stp116State\""))
 
         val forbiddenRuntimeKeys = listOf(
             "pageRuntimes",
+            "stp116PageRuntimes",
+            "scheduledTriggers",
             "scheduledNoteOffs",
+            "dividerCounter",
+            "globalStepCounter",
+            "activeStp116Notes",
             "activeCcSlew",
             "rptrStatesByPage",
             "activeRptrDivisionsByPage",
@@ -519,6 +545,192 @@ class ProtoseqSessionStoreTest {
 
         val decoded = protoseqSessionStateFromJsonObject(json)
         assertEquals(2, decoded.pages[0].ginaArpState.steps[0].arpLength)
+    }
+
+    @Test
+    fun stp116CustomGlobalStateRoundTripPreservesValues() {
+        val customState = Stp116SequencerUiState(
+            midiChannel = 9,
+            sequenceLength = 13,
+            clockDivider = 4,
+            playbackMode = Stp116PlaybackMode.CENTRIC,
+            bernoulliDropChance = 0.25f,
+            randomGateLengthAmount = 0.5f,
+            randomVelocityAmount = 0.75f,
+        ).normalizedStp116()
+
+        val session = ProtoseqSessionState().updatePage(2) { page ->
+            page.copy(
+                selectedSequencerType = SequencerType.STP_116,
+                stp116State = customState,
+            )
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val stp116 = decoded.pages[2].stp116State
+
+        assertEquals(customState, stp116)
+        assertEquals(SequencerType.STP_116, decoded.pages[2].selectedSequencerType)
+    }
+
+    @Test
+    fun stp116CustomStepsRoundTripPreservesValues() {
+        val customSteps = List(16) { Stp116StepState() }.toMutableList().apply {
+            this[0] = Stp116StepState(
+                enabled = true,
+                pitchClass = 1,
+                octave = 5,
+                fineTuneCents = -12,
+                gateDelayTicks = 4,
+                gateLengthTicks = 10,
+                velocity = 88,
+            )
+            this[7] = Stp116StepState(
+                enabled = true,
+                pitchClass = 10,
+                octave = 2,
+                fineTuneCents = 35,
+                gateDelayTicks = 12,
+                gateLengthTicks = 6,
+                velocity = 45,
+            )
+        }
+
+        val customState = Stp116SequencerUiState(steps = customSteps).normalizedStp116()
+
+        val session = ProtoseqSessionState().updatePage(3) { page ->
+            page.copy(stp116State = customState)
+        }
+
+        val decoded = protoseqSessionStateFromJsonObject(session.toJsonObject())
+        val stp116 = decoded.pages[3].stp116State
+
+        assertEquals(customState.steps[0], stp116.steps[0])
+        assertEquals(customState.steps[7], stp116.steps[7])
+    }
+
+    @Test
+    fun missingStp116StateFallsBackToDefaults() {
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray().put(
+                    JSONObject()
+                        .put("pageIndex", 0)
+                        .put("enabled", true)
+                        .put("selectedSequencerType", SequencerType.EMPTY.name)
+                )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+
+        assertEquals(Stp116SequencerUiState().normalizedStp116(), decoded.pages[0].stp116State)
+    }
+
+    @Test
+    fun invalidIncompleteStp116StateNormalizesSafely() {
+        val tooFewSteps = JSONArray().put(
+            JSONObject()
+                .put("enabled", true)
+                .put("pitchClass", 99)
+                .put("octave", -5)
+                .put("fineTuneCents", 999)
+                .put("gateDelayTicks", 999)
+                .put("gateLengthTicks", 999)
+                .put("velocity", 0)
+        )
+
+        val tooManySteps = JSONArray().apply {
+            repeat(30) { index ->
+                put(
+                    JSONObject()
+                        .put("enabled", index % 2 == 0)
+                        .put("pitchClass", if (index == 0) -1 else 5)
+                        .put("octave", 99)
+                        .put("fineTuneCents", -999)
+                        .put("gateDelayTicks", -10)
+                        .put("gateLengthTicks", 0)
+                        .put("velocity", 999)
+                )
+            }
+        }
+
+        val json = JSONObject()
+            .put("version", 1)
+            .put("selectedPageIndex", 0)
+            .put(
+                "pages",
+                JSONArray()
+                    .put(
+                        JSONObject()
+                            .put("pageIndex", 0)
+                            .put(
+                                "stp116State",
+                                JSONObject()
+                                    .put("midiChannel", 999)
+                                    .put("sequenceLength", 999)
+                                    .put("clockDivider", 999)
+                                    .put("playbackMode", "NOPE")
+                                    .put("bernoulliDropChance", 99.0)
+                                    .put("randomGateLengthAmount", 99.0)
+                                    .put("randomVelocityAmount", 99.0)
+                                    .put("steps", tooFewSteps)
+                            )
+                    )
+                    .put(
+                        JSONObject()
+                            .put("pageIndex", 1)
+                            .put(
+                                "stp116State",
+                                JSONObject()
+                                    .put("midiChannel", -10)
+                                    .put("sequenceLength", -10)
+                                    .put("clockDivider", -10)
+                                    .put("playbackMode", "WRONG")
+                                    .put("bernoulliDropChance", -5.0)
+                                    .put("randomGateLengthAmount", -5.0)
+                                    .put("randomVelocityAmount", -5.0)
+                                    .put("steps", tooManySteps)
+                            )
+                    )
+            )
+
+        val decoded = protoseqSessionStateFromJsonObject(json)
+        val page0State = decoded.pages[0].stp116State
+        val page1State = decoded.pages[1].stp116State
+
+        assertEquals(16, page0State.midiChannel)
+        assertEquals(16, page0State.sequenceLength)
+        assertEquals(16, page0State.clockDivider)
+        assertEquals(Stp116PlaybackMode.FORWARD, page0State.playbackMode)
+        assertEquals(1f, page0State.bernoulliDropChance)
+        assertEquals(1f, page0State.randomGateLengthAmount)
+        assertEquals(1f, page0State.randomVelocityAmount)
+        assertEquals(16, page0State.steps.size)
+        assertTrue(page0State.steps[0].enabled)
+        assertEquals(11, page0State.steps[0].pitchClass)
+        assertEquals(0, page0State.steps[0].octave)
+        assertEquals(100, page0State.steps[0].fineTuneCents)
+        assertEquals(20, page0State.steps[0].gateDelayTicks)
+        assertEquals(3, page0State.steps[0].gateLengthTicks)
+        assertEquals(1, page0State.steps[0].velocity)
+
+        assertEquals(1, page1State.midiChannel)
+        assertEquals(1, page1State.sequenceLength)
+        assertEquals(1, page1State.clockDivider)
+        assertEquals(Stp116PlaybackMode.FORWARD, page1State.playbackMode)
+        assertEquals(0f, page1State.bernoulliDropChance)
+        assertEquals(0f, page1State.randomGateLengthAmount)
+        assertEquals(0f, page1State.randomVelocityAmount)
+        assertEquals(16, page1State.steps.size)
+        assertEquals(0, page1State.steps[0].pitchClass)
+        assertEquals(8, page1State.steps[0].octave)
+        assertEquals(-100, page1State.steps[0].fineTuneCents)
+        assertEquals(0, page1State.steps[0].gateDelayTicks)
+        assertEquals(3, page1State.steps[0].gateLengthTicks)
+        assertEquals(127, page1State.steps[0].velocity)
     }
 
     @Test
