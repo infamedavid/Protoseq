@@ -31,7 +31,10 @@ import com.infamedavid.protoseq.features.ginaarp.normalized
 import com.infamedavid.protoseq.features.stp116.Stp116SequencerConfig
 import com.infamedavid.protoseq.features.stp116.Stp116StepConfig
 import com.infamedavid.protoseq.features.stp116.advanceStp116ClockDivider
+import com.infamedavid.protoseq.features.stp116.calculateStp116FinalGateLengthTicks
+import com.infamedavid.protoseq.features.stp116.calculateStp116FinalVelocity
 import com.infamedavid.protoseq.features.stp116.resolveStp116StepIndex
+import com.infamedavid.protoseq.features.stp116.shouldDropStp116Gate
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
@@ -566,6 +569,7 @@ class TransportViewModel(
             val config = activeStp116PageConfigs[pageIndex] ?: return@forEach
 
             processDueStp116NoteOffsLocked(pageIndex, runtime, currentTick)
+            processDueStp116TriggersLocked(pageIndex, runtime, currentTick)
 
             if (!isSequencerStepTick(currentTick) || runtime.lastProcessedStepTick == currentTick) {
                 return@forEach
@@ -597,35 +601,88 @@ class TransportViewModel(
                 return@forEach
             }
 
-            fireStp116StepLocked(
-                pageIndex = pageIndex,
+            val shouldDrop = shouldDropStp116Gate(
+                bernoulliDropChance = config.bernoulliDropChance,
+                randomFloatProvider = { runtime.random.nextFloat() }
+            )
+            if (shouldDrop) {
+                return@forEach
+            }
+
+            val finalVelocity = calculateStp116FinalVelocity(
+                velocity = step.velocity,
+                randomVelocityAmount = config.randomVelocityAmount,
+                randomIntProvider = { minInclusive, maxInclusive ->
+                    runtime.random.nextInt(minInclusive, maxInclusive + 1)
+                }
+            )
+
+            val finalGateLengthTicks = calculateStp116FinalGateLengthTicks(
+                gateLengthTicks = step.gateLengthTicks,
+                gateDelayTicks = step.gateDelayTicks,
+                randomGateLengthAmount = config.randomGateLengthAmount,
+                randomIntProvider = { minInclusive, maxInclusive ->
+                    runtime.random.nextInt(minInclusive, maxInclusive + 1)
+                }
+            )
+
+            scheduleStp116StepTriggerLocked(
                 runtime = runtime,
                 step = step,
                 currentTick = currentTick,
-                config = config
+                config = config,
+                finalVelocity = finalVelocity,
+                finalGateLengthTicks = finalGateLengthTicks
             )
+
+            processDueStp116TriggersLocked(pageIndex, runtime, currentTick)
         }
     }
 
-    private fun fireStp116StepLocked(
-        pageIndex: Int,
+    private fun scheduleStp116StepTriggerLocked(
         runtime: Stp116PageRuntime,
         step: Stp116StepConfig,
         currentTick: Long,
-        config: Stp116SequencerConfig
+        config: Stp116SequencerConfig,
+        finalVelocity: Int,
+        finalGateLengthTicks: Long
     ) {
-        sendPageNoteOnLocked(
-            pageIndex = pageIndex,
+        val triggerDueTick = currentTick + step.gateDelayTicks.toLong()
+
+        runtime.scheduledTriggers += Stp116ScheduledTrigger(
+            dueTick = triggerDueTick,
             channel = config.midiChannel,
             note = step.midiNote,
-            velocity = step.velocity
+            velocity = finalVelocity,
+            gateLengthTicks = finalGateLengthTicks,
         )
+    }
 
-        runtime.scheduledNoteOffs += Stp116ScheduledNoteOff(
-            dueTick = currentTick + STP_116_BASIC_GATE_TICKS,
-            channel = config.midiChannel,
-            note = step.midiNote
-        )
+    private fun processDueStp116TriggersLocked(
+        pageIndex: Int,
+        runtime: Stp116PageRuntime,
+        currentTick: Long
+    ) {
+        val iterator = runtime.scheduledTriggers.iterator()
+        while (iterator.hasNext()) {
+            val trigger = iterator.next()
+            if (trigger.dueTick <= currentTick) {
+                sendPageNoteOnLocked(
+                    pageIndex = pageIndex,
+                    channel = trigger.channel,
+                    note = trigger.note,
+                    velocity = trigger.velocity,
+                )
+
+                runtime.scheduledNoteOffs += Stp116ScheduledNoteOff(
+                    dueTick = currentTick + trigger.gateLengthTicks,
+                    channel = trigger.channel,
+                    note = trigger.note,
+                )
+
+                iterator.remove()
+            }
+        }
     }
 
     private fun processDueStp116NoteOffsLocked(
@@ -941,6 +998,7 @@ class TransportViewModel(
     }
 
     private fun clearStp116ScheduledEvents(runtime: Stp116PageRuntime) {
+        runtime.scheduledTriggers.clear()
         runtime.scheduledNoteOffs.clear()
     }
 
@@ -957,7 +1015,7 @@ class TransportViewModel(
     ) {
         runtime.globalStepCounter = 0L
         runtime.lastProcessedStepTick = null
-        runtime.scheduledNoteOffs.clear()
+        clearStp116ScheduledEvents(runtime)
         runtime.dividerCounter = initialStp116DividerCounter(config?.clockDivider ?: 1)
     }
 
@@ -1073,7 +1131,6 @@ class TransportViewModel(
         private const val MIDI_MAX = 127
         private const val GRID_616_MAX_SWING_AMOUNT = 0.75f
         private val GRID_616_TRACK_MAX_SWING_DELAY_TICKS = listOf(3, 2, 4, 3, 2, 4)
-        private const val STP_116_BASIC_GATE_TICKS = 12L
 
         fun factory(context: Context): ViewModelProvider.Factory {
             val appContext = context.applicationContext
@@ -1151,11 +1208,20 @@ class TransportViewModel(
         val note: Int
     )
 
+    private data class Stp116ScheduledTrigger(
+        val dueTick: Long,
+        val channel: Int,
+        val note: Int,
+        val velocity: Int,
+        val gateLengthTicks: Long,
+    )
+
     private data class Stp116PageRuntime(
         val pageIndex: Int,
         var lastProcessedStepTick: Long? = null,
         var globalStepCounter: Long = 0L,
         var dividerCounter: Int = 0,
+        val scheduledTriggers: MutableList<Stp116ScheduledTrigger> = mutableListOf(),
         val scheduledNoteOffs: MutableList<Stp116ScheduledNoteOff> = mutableListOf(),
         val random: Random = Random.Default
     )
