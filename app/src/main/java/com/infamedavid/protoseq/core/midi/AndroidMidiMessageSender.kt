@@ -96,6 +96,21 @@ class AndroidMidiMessageSender(
         )
     }
 
+    override fun sendPitchBend(channel: Int, value: Int) {
+        val status = (0xE0 or ((channel.coerceIn(1, 16)) - 1)).toByte()
+        val clampedValue = value.coerceIn(0, 16383)
+        val lsb = (clampedValue and 0x7F).toByte()
+        val msb = ((clampedValue shr 7) and 0x7F).toByte()
+
+        sendMessage(
+            byteArrayOf(
+                status,
+                lsb,
+                msb
+            )
+        )
+    }
+
     private fun sendMessage(data: ByteArray) {
         synchronized(lock) {
             val inputPort = currentInputPort ?: return
