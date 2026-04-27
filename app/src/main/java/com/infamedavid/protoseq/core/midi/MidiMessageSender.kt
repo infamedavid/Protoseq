@@ -9,5 +9,6 @@ interface MidiMessageSender {
     fun sendClock()
     fun sendNoteOn(channel: Int, note: Int, velocity: Int)
     fun sendNoteOff(channel: Int, note: Int, velocity: Int = 0)
+    fun sendPitchBend(channel: Int, value: Int)
     fun sendControlChange(channel: Int, controller: Int, value: Int)
 }

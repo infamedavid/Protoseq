@@ -30,10 +30,12 @@ import com.infamedavid.protoseq.features.ginaarp.generateGinaArpNote
 import com.infamedavid.protoseq.features.ginaarp.normalized
 import com.infamedavid.protoseq.features.stp116.Stp116SequencerConfig
 import com.infamedavid.protoseq.features.stp116.Stp116StepConfig
+import com.infamedavid.protoseq.features.stp116.STP_116_PITCH_BEND_CENTER
 import com.infamedavid.protoseq.features.stp116.advanceStp116ClockDivider
 import com.infamedavid.protoseq.features.stp116.calculateStp116FinalGateLengthTicks
 import com.infamedavid.protoseq.features.stp116.calculateStp116FinalVelocity
 import com.infamedavid.protoseq.features.stp116.resolveStp116StepIndex
+import com.infamedavid.protoseq.features.stp116.stp116PitchBendValueFromCents
 import com.infamedavid.protoseq.features.stp116.shouldDropStp116Gate
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
@@ -639,6 +641,57 @@ class TransportViewModel(
         }
     }
 
+    private fun sendStp116PitchBendLocked(channel: Int, value: Int) {
+        midiEngine.sendPitchBend(
+            channel = channel,
+            value = value.coerceIn(0, 16383)
+        )
+    }
+
+    private fun registerStp116BentNoteLocked(
+        runtime: Stp116PageRuntime,
+        channel: Int,
+        pitchBendValue: Int,
+    ) {
+        if (pitchBendValue == STP_116_PITCH_BEND_CENTER) return
+
+        val safeChannel = channel.coerceIn(1, 16)
+        val nextCount = (runtime.activeBentNoteCountsByChannel[safeChannel] ?: 0) + 1
+        runtime.activeBentNoteCountsByChannel[safeChannel] = nextCount
+    }
+
+    private fun releaseStp116BentNoteLocked(
+        runtime: Stp116PageRuntime,
+        channel: Int,
+        pitchBendValue: Int,
+    ) {
+        if (pitchBendValue == STP_116_PITCH_BEND_CENTER) return
+
+        val safeChannel = channel.coerceIn(1, 16)
+        val currentCount = runtime.activeBentNoteCountsByChannel[safeChannel] ?: 0
+        val nextCount = (currentCount - 1).coerceAtLeast(0)
+
+        if (nextCount == 0) {
+            runtime.activeBentNoteCountsByChannel.remove(safeChannel)
+            sendStp116PitchBendLocked(
+                channel = safeChannel,
+                value = STP_116_PITCH_BEND_CENTER
+            )
+        } else {
+            runtime.activeBentNoteCountsByChannel[safeChannel] = nextCount
+        }
+    }
+
+    private fun resetStp116PitchBendsLocked(runtime: Stp116PageRuntime) {
+        runtime.activeBentNoteCountsByChannel.keys.toList().forEach { channel ->
+            sendStp116PitchBendLocked(
+                channel = channel,
+                value = STP_116_PITCH_BEND_CENTER
+            )
+        }
+        runtime.activeBentNoteCountsByChannel.clear()
+    }
+
     private fun scheduleStp116StepTriggerLocked(
         runtime: Stp116PageRuntime,
         step: Stp116StepConfig,
@@ -648,12 +701,14 @@ class TransportViewModel(
         finalGateLengthTicks: Long
     ) {
         val triggerDueTick = currentTick + step.gateDelayTicks.toLong()
+        val pitchBendValue = stp116PitchBendValueFromCents(step.fineTuneCents)
 
         runtime.scheduledTriggers += Stp116ScheduledTrigger(
             dueTick = triggerDueTick,
             channel = config.midiChannel,
             note = step.midiNote,
             velocity = finalVelocity,
+            pitchBendValue = pitchBendValue,
             gateLengthTicks = finalGateLengthTicks,
         )
     }
@@ -667,6 +722,11 @@ class TransportViewModel(
         while (iterator.hasNext()) {
             val trigger = iterator.next()
             if (trigger.dueTick <= currentTick) {
+                sendStp116PitchBendLocked(
+                    channel = trigger.channel,
+                    value = trigger.pitchBendValue,
+                )
+
                 sendPageNoteOnLocked(
                     pageIndex = pageIndex,
                     channel = trigger.channel,
@@ -674,10 +734,17 @@ class TransportViewModel(
                     velocity = trigger.velocity,
                 )
 
+                registerStp116BentNoteLocked(
+                    runtime = runtime,
+                    channel = trigger.channel,
+                    pitchBendValue = trigger.pitchBendValue,
+                )
+
                 runtime.scheduledNoteOffs += Stp116ScheduledNoteOff(
                     dueTick = currentTick + trigger.gateLengthTicks,
                     channel = trigger.channel,
                     note = trigger.note,
+                    pitchBendValue = trigger.pitchBendValue,
                 )
 
                 iterator.remove()
@@ -695,6 +762,13 @@ class TransportViewModel(
             val scheduled = iterator.next()
             if (scheduled.dueTick <= currentTick) {
                 releasePageNoteLocked(pageIndex, scheduled.channel, scheduled.note)
+
+                releaseStp116BentNoteLocked(
+                    runtime = runtime,
+                    channel = scheduled.channel,
+                    pitchBendValue = scheduled.pitchBendValue,
+                )
+
                 iterator.remove()
             }
         }
@@ -1006,6 +1080,7 @@ class TransportViewModel(
         stp116PageRuntimes.remove(pageIndex)?.let { runtime ->
             clearStp116ScheduledEvents(runtime)
             releasePageNotesLocked(pageIndex)
+            resetStp116PitchBendsLocked(runtime)
         }
     }
 
@@ -1016,6 +1091,7 @@ class TransportViewModel(
         runtime.globalStepCounter = 0L
         runtime.lastProcessedStepTick = null
         clearStp116ScheduledEvents(runtime)
+        resetStp116PitchBendsLocked(runtime)
         runtime.dividerCounter = initialStp116DividerCounter(config?.clockDivider ?: 1)
     }
 
@@ -1053,6 +1129,7 @@ class TransportViewModel(
             val runtime = stp116PageRuntimes[pageIndex] ?: return@forEach
             clearStp116ScheduledEvents(runtime)
             releasePageNotesLocked(pageIndex)
+            resetStp116PitchBendsLocked(runtime)
         }
     }
 
@@ -1061,6 +1138,7 @@ class TransportViewModel(
             clearStp116ScheduledEvents(runtime)
             runtime.globalStepCounter = 0L
             runtime.lastProcessedStepTick = null
+            resetStp116PitchBendsLocked(runtime)
             val config = activeStp116PageConfigs[runtime.pageIndex]
             runtime.dividerCounter = initialStp116DividerCounter(config?.clockDivider ?: 1)
         }
@@ -1205,7 +1283,8 @@ class TransportViewModel(
     private data class Stp116ScheduledNoteOff(
         val dueTick: Long,
         val channel: Int,
-        val note: Int
+        val note: Int,
+        val pitchBendValue: Int,
     )
 
     private data class Stp116ScheduledTrigger(
@@ -1213,6 +1292,7 @@ class TransportViewModel(
         val channel: Int,
         val note: Int,
         val velocity: Int,
+        val pitchBendValue: Int,
         val gateLengthTicks: Long,
     )
 
@@ -1223,6 +1303,7 @@ class TransportViewModel(
         var dividerCounter: Int = 0,
         val scheduledTriggers: MutableList<Stp116ScheduledTrigger> = mutableListOf(),
         val scheduledNoteOffs: MutableList<Stp116ScheduledNoteOff> = mutableListOf(),
+        val activeBentNoteCountsByChannel: MutableMap<Int, Int> = mutableMapOf(),
         val random: Random = Random.Default
     )
 
