@@ -382,6 +382,9 @@ fun AppScreen() {
                     }
                 },
                 onResetParameters = {
+                    if (currentPage.selectedSequencerType == SequencerType.STP_116) {
+                        transportViewModel.deactivatePageRuntime(currentPage.pageIndex)
+                    }
                     sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
                         when (page.selectedSequencerType) {
                             SequencerType.TURING_MACHINE -> page.copy(turingState = StochasticSequencerUiState())
