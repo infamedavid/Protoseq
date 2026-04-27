@@ -28,6 +28,10 @@ import com.infamedavid.protoseq.features.ginaarp.GinaArpSequencerUiState
 import com.infamedavid.protoseq.features.ginaarp.GinaArpStepState
 import com.infamedavid.protoseq.features.ginaarp.generateGinaArpNote
 import com.infamedavid.protoseq.features.ginaarp.normalized
+import com.infamedavid.protoseq.features.stp116.Stp116SequencerConfig
+import com.infamedavid.protoseq.features.stp116.Stp116StepConfig
+import com.infamedavid.protoseq.features.stp116.advanceStp116ClockDivider
+import com.infamedavid.protoseq.features.stp116.resolveStp116StepIndex
 import com.infamedavid.protoseq.features.stochastic.MidiOutputMode
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerConfig
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerEngine
@@ -58,9 +62,11 @@ class TransportViewModel(
     private val activeTuringPageConfigs = mutableMapOf<Int, StochasticSequencerConfig>()
     private val activeGrid616PageConfigs = mutableMapOf<Int, Grid616SequencerConfig>()
     private val activeGinaArpPageConfigs = mutableMapOf<Int, GinaArpSequencerUiState>()
+    private val activeStp116PageConfigs = mutableMapOf<Int, Stp116SequencerConfig>()
     private val pageRuntimes = mutableMapOf<Int, PageRuntime>()
     private val grid616PageRuntimes = mutableMapOf<Int, Grid616PageRuntime>()
     private val ginaArpPageRuntimes = mutableMapOf<Int, GinaArpPageRuntime>()
+    private val stp116PageRuntimes = mutableMapOf<Int, Stp116PageRuntime>()
     private val activeMidiNotes = ActiveMidiNoteRegistry()
     private var latestClockTick: Long = 1L
 
@@ -102,6 +108,7 @@ class TransportViewModel(
                     }
                     processGrid616TickLocked(tick)
                     processGinaArpTickLocked(tick)
+                    processStp116TickLocked(tick)
                     syncRptrUiState()
                 }
                 if (tick % 4L == 0L) {
@@ -158,6 +165,12 @@ class TransportViewModel(
                                 state = activeGinaArpPageConfigs[runtime.pageIndex]
                             )
                         }
+                        stp116PageRuntimes.values.forEach { runtime ->
+                            resetStp116RuntimeForTransportStart(
+                                runtime = runtime,
+                                config = activeStp116PageConfigs[runtime.pageIndex]
+                            )
+                        }
                         syncRptrUiState()
                         clockEngine.playFromStart()
                         midiEngine.sendStart()
@@ -188,6 +201,7 @@ class TransportViewModel(
                         }
                         resetAllGrid616RuntimesLocked()
                         pauseAllGinaArpRuntimesLocked()
+                        pauseAllStp116RuntimesLocked()
                         releaseAllNotesLocked()
                         syncRptrUiState()
                         clockEngine.stop()
@@ -211,6 +225,7 @@ class TransportViewModel(
                     }
                     pauseAllGrid616RuntimesLocked()
                     pauseAllGinaArpRuntimesLocked()
+                    pauseAllStp116RuntimesLocked()
                     syncRptrUiState()
                     clockEngine.pause()
                 }
@@ -245,9 +260,11 @@ class TransportViewModel(
                 activeTuringPageConfigs.remove(pageIndex)
                 activeGrid616PageConfigs.remove(pageIndex)
                 activeGinaArpPageConfigs.remove(pageIndex)
+                activeStp116PageConfigs.remove(pageIndex)
                 clearPageRuntimeLocked(pageIndex)
                 clearGrid616PageRuntimeLocked(pageIndex)
                 clearGinaArpPageRuntimeLocked(pageIndex)
+                clearStp116PageRuntimeLocked(pageIndex)
                 syncRptrUiState()
             }
         }
@@ -285,6 +302,28 @@ class TransportViewModel(
                     activeGinaArpPageConfigs[pageIndex] = nextState
                     val runtime = ginaArpPageRuntimes.getOrPut(pageIndex) { GinaArpPageRuntime(pageIndex = pageIndex) }
                     clampGinaArpRuntimePosition(runtime, nextState)
+                }
+            }
+        }
+    }
+
+    fun updateStp116PageConfigs(configs: List<Stp116PageConfig>) {
+        vmScope.launch {
+            runtimeMutex.withLock {
+                val nextConfigsByPage = configs.associate { it.pageIndex to it.config }
+                val removedPageIndexes = activeStp116PageConfigs.keys - nextConfigsByPage.keys
+
+                removedPageIndexes.forEach { pageIndex ->
+                    activeStp116PageConfigs.remove(pageIndex)
+                    clearStp116PageRuntimeLocked(pageIndex)
+                }
+
+                nextConfigsByPage.forEach { (pageIndex, nextConfig) ->
+                    activeStp116PageConfigs[pageIndex] = nextConfig
+                    val runtime = stp116PageRuntimes.getOrPut(pageIndex) {
+                        Stp116PageRuntime(pageIndex = pageIndex)
+                    }
+                    clampStp116RuntimeLocked(runtime, nextConfig)
                 }
             }
         }
@@ -501,6 +540,88 @@ class TransportViewModel(
             advanceGinaArpPosition(runtime, state, step)
             val ticksPerGeneratedGate = (TICKS_PER_STEP * state.tempoDivisor.toLong()).coerceAtLeast(1L)
             runtime.nextGateTick = currentTick + ticksPerGeneratedGate
+        }
+    }
+
+    private fun processStp116TickLocked(currentTick: Long) {
+        stp116PageRuntimes.forEach { (pageIndex, runtime) ->
+            val config = activeStp116PageConfigs[pageIndex] ?: return@forEach
+
+            processDueStp116NoteOffsLocked(pageIndex, runtime, currentTick)
+
+            if (!isSequencerStepTick(currentTick) || runtime.lastProcessedStepTick == currentTick) {
+                return@forEach
+            }
+
+            runtime.lastProcessedStepTick = currentTick
+
+            val dividerResult = advanceStp116ClockDivider(
+                currentCounter = runtime.dividerCounter,
+                clockDivider = config.clockDivider
+            )
+            runtime.dividerCounter = dividerResult.nextCounter
+
+            if (!dividerResult.shouldAdvance) {
+                return@forEach
+            }
+
+            val stepIndex = resolveStp116StepIndex(
+                globalStepCounter = runtime.globalStepCounter,
+                length = config.sequenceLength,
+                playbackMode = config.playbackMode,
+                randomIndexProvider = { length -> runtime.random.nextInt(until = length) }
+            )
+
+            runtime.globalStepCounter += 1L
+
+            val step = config.steps.getOrNull(stepIndex) ?: return@forEach
+            if (!step.enabled) {
+                return@forEach
+            }
+
+            fireStp116StepLocked(
+                pageIndex = pageIndex,
+                runtime = runtime,
+                step = step,
+                currentTick = currentTick,
+                config = config
+            )
+        }
+    }
+
+    private fun fireStp116StepLocked(
+        pageIndex: Int,
+        runtime: Stp116PageRuntime,
+        step: Stp116StepConfig,
+        currentTick: Long,
+        config: Stp116SequencerConfig
+    ) {
+        sendPageNoteOnLocked(
+            pageIndex = pageIndex,
+            channel = config.midiChannel,
+            note = step.midiNote,
+            velocity = step.velocity
+        )
+
+        runtime.scheduledNoteOffs += Stp116ScheduledNoteOff(
+            dueTick = currentTick + STP_116_BASIC_GATE_TICKS,
+            channel = config.midiChannel,
+            note = step.midiNote
+        )
+    }
+
+    private fun processDueStp116NoteOffsLocked(
+        pageIndex: Int,
+        runtime: Stp116PageRuntime,
+        currentTick: Long
+    ) {
+        val iterator = runtime.scheduledNoteOffs.iterator()
+        while (iterator.hasNext()) {
+            val scheduled = iterator.next()
+            if (scheduled.dueTick <= currentTick) {
+                releasePageNoteLocked(pageIndex, scheduled.channel, scheduled.note)
+                iterator.remove()
+            }
         }
     }
 
@@ -845,6 +966,62 @@ class TransportViewModel(
         }
     }
 
+    private fun clearStp116ScheduledEvents(runtime: Stp116PageRuntime) {
+        runtime.scheduledNoteOffs.clear()
+    }
+
+    private fun clearStp116PageRuntimeLocked(pageIndex: Int) {
+        stp116PageRuntimes.remove(pageIndex)?.let { runtime ->
+            clearStp116ScheduledEvents(runtime)
+            releasePageNotesLocked(pageIndex)
+        }
+    }
+
+    private fun resetStp116RuntimeForTransportStart(
+        runtime: Stp116PageRuntime,
+        config: Stp116SequencerConfig?
+    ) {
+        runtime.globalStepCounter = 0L
+        runtime.lastProcessedStepTick = null
+        runtime.scheduledNoteOffs.clear()
+        runtime.dividerCounter = initialStp116DividerCounter(config?.clockDivider ?: 1)
+    }
+
+    private fun pauseAllStp116RuntimesLocked() {
+        stp116PageRuntimes.keys.toList().forEach { pageIndex ->
+            val runtime = stp116PageRuntimes[pageIndex] ?: return@forEach
+            clearStp116ScheduledEvents(runtime)
+            releasePageNotesLocked(pageIndex)
+        }
+    }
+
+    private fun resetAllStp116RuntimesLocked() {
+        stp116PageRuntimes.values.forEach { runtime ->
+            clearStp116ScheduledEvents(runtime)
+            runtime.globalStepCounter = 0L
+            runtime.lastProcessedStepTick = null
+            val config = activeStp116PageConfigs[runtime.pageIndex]
+            runtime.dividerCounter = initialStp116DividerCounter(config?.clockDivider ?: 1)
+        }
+    }
+
+    private fun clearAllStp116RuntimesLocked() {
+        stp116PageRuntimes.keys.toList().forEach(::clearStp116PageRuntimeLocked)
+    }
+
+    private fun clampStp116RuntimeLocked(
+        runtime: Stp116PageRuntime,
+        config: Stp116SequencerConfig
+    ) {
+        val safeDivider = config.clockDivider.coerceAtLeast(1)
+        runtime.dividerCounter = runtime.dividerCounter.coerceIn(0, safeDivider - 1)
+    }
+
+    private fun initialStp116DividerCounter(clockDivider: Int): Int {
+        val safeDivider = clockDivider.coerceAtLeast(1)
+        return safeDivider - 1
+    }
+
     private fun syncRptrUiState() {
         val statesByPage = mutableMapOf<Int, RptrUiRuntimeState>()
         val activeDivisionsByPage = mutableMapOf<Int, RptrDivision?>()
@@ -877,6 +1054,7 @@ class TransportViewModel(
                 }
                 clearAllGrid616RuntimesLocked()
                 ginaArpPageRuntimes.keys.toList().forEach(::clearGinaArpPageRuntimeLocked)
+                clearAllStp116RuntimesLocked()
                 releaseAllNotesLocked()
                 syncRptrUiState()
             }
@@ -891,6 +1069,7 @@ class TransportViewModel(
         private const val MIDI_MIN = 0
         private const val MIDI_MAX = 127
         private const val GRID_616_MAX_SWING_AMOUNT = 0.75f
+        private const val STP_116_BASIC_GATE_TICKS = 12L
         private val GRID_616_TRACK_MAX_SWING_DELAY_TICKS = listOf(3, 2, 4, 3, 2, 4)
 
         fun factory(context: Context): ViewModelProvider.Factory {
@@ -963,6 +1142,21 @@ class TransportViewModel(
         val random: Random = Random.Default
     )
 
+    private data class Stp116ScheduledNoteOff(
+        val dueTick: Long,
+        val channel: Int,
+        val note: Int
+    )
+
+    private data class Stp116PageRuntime(
+        val pageIndex: Int,
+        var lastProcessedStepTick: Long? = null,
+        var globalStepCounter: Long = 0L,
+        var dividerCounter: Int = 0,
+        val scheduledNoteOffs: MutableList<Stp116ScheduledNoteOff> = mutableListOf(),
+        val random: Random = Random.Default
+    )
+
     private data class PageRuntime(
         val pageIndex: Int,
         val sequencerEngine: StochasticSequencerEngine = StochasticSequencerEngine(),
@@ -986,4 +1180,9 @@ data class Grid616PageConfig(
 data class GinaArpPageConfig(
     val pageIndex: Int,
     val state: GinaArpSequencerUiState
+)
+
+data class Stp116PageConfig(
+    val pageIndex: Int,
+    val config: Stp116SequencerConfig
 )
