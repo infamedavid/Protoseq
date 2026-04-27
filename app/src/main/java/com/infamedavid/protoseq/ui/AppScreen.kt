@@ -71,6 +71,7 @@ import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
 import com.infamedavid.protoseq.ui.sequencers.GinaArpPanel
 import com.infamedavid.protoseq.ui.sequencers.Grid616Panel
+import com.infamedavid.protoseq.ui.sequencers.Stp116Panel
 import com.infamedavid.protoseq.ui.sequencers.TuringMachinePanel
 import com.infamedavid.protoseq.ui.util.buildMidiTargetShortLabels
 import com.infamedavid.protoseq.ui.util.midiNoteToDisplay
@@ -569,23 +570,17 @@ fun AppScreen() {
                 }
 
                 SequencerType.STP_116 -> {
-                    Column(
+                    Stp116Panel(
+                        state = currentPage.stp116State,
+                        onStateChange = { next ->
+                            sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
+                                page.copy(stp116State = next.normalizedStp116())
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "STP 116",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = "16-step melodic sequencer. UI coming next.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                            .padding(vertical = 12.dp)
+                    )
                 }
             }
 
