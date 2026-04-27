@@ -61,11 +61,13 @@ import com.infamedavid.protoseq.features.sequencer.selectPage
 import com.infamedavid.protoseq.features.sequencer.updatePage
 import com.infamedavid.protoseq.features.stp116.Stp116SequencerUiState
 import com.infamedavid.protoseq.features.stp116.normalized as normalizedStp116
+import com.infamedavid.protoseq.features.stp116.toConfig as toStp116Config
 import com.infamedavid.protoseq.features.stochastic.StochasticSequencerUiState
 import com.infamedavid.protoseq.features.stochastic.toConfig
 import com.infamedavid.protoseq.features.transport.RptrUiRuntimeState
 import com.infamedavid.protoseq.features.transport.GinaArpPageConfig
 import com.infamedavid.protoseq.features.transport.Grid616PageConfig
+import com.infamedavid.protoseq.features.transport.Stp116PageConfig
 import com.infamedavid.protoseq.features.transport.TuringPageConfig
 import com.infamedavid.protoseq.features.transport.TransportViewModel
 import com.infamedavid.protoseq.ui.components.ProtoControlShape
@@ -184,6 +186,23 @@ fun AppScreen() {
 
     LaunchedEffect(ginaArpPageConfigs) {
         transportViewModel.updateGinaArpPageConfigs(ginaArpPageConfigs)
+    }
+
+    val stp116PageConfigs = remember(sessionState.pages) {
+        sessionState.pages
+            .filter {
+                it.selectedSequencerType == SequencerType.STP_116 && it.enabled
+            }
+            .map { page ->
+                Stp116PageConfig(
+                    pageIndex = page.pageIndex,
+                    config = page.stp116State.toStp116Config()
+                )
+            }
+    }
+
+    LaunchedEffect(stp116PageConfigs) {
+        transportViewModel.updateStp116PageConfigs(stp116PageConfigs)
     }
 
     LaunchedEffect(sessionState) {
@@ -363,6 +382,9 @@ fun AppScreen() {
                     }
                 },
                 onResetParameters = {
+                    if (currentPage.selectedSequencerType == SequencerType.STP_116) {
+                        transportViewModel.deactivatePageRuntime(currentPage.pageIndex)
+                    }
                     sessionState = sessionState.updatePage(currentPage.pageIndex) { page ->
                         when (page.selectedSequencerType) {
                             SequencerType.TURING_MACHINE -> page.copy(turingState = StochasticSequencerUiState())
