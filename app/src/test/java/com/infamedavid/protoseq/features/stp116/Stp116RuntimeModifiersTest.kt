@@ -40,6 +40,12 @@ class Stp116RuntimeModifiersTest {
     }
 
     @Test
+    fun dropRandomProviderOutputIsClampedSafely() {
+        assertTrue(shouldDropStp116Gate(0.5f) { -1f })
+        assertFalse(shouldDropStp116Gate(0.5f) { 2f })
+    }
+
+    @Test
     fun velocityAmountZeroReturnsExactVelocity() {
         assertEquals(
             100,
@@ -69,6 +75,37 @@ class Stp116RuntimeModifiersTest {
                 randomIntProvider = { _, _ -> 64 },
             ),
         )
+    }
+
+    @Test
+    fun velocityAmountBelowZeroBehavesLikeZero() {
+        assertEquals(
+            90,
+            calculateStp116FinalVelocity(
+                velocity = 90,
+                randomVelocityAmount = -0.5f,
+                randomIntProvider = { _, _ -> 1 },
+            ),
+        )
+    }
+
+    @Test
+    fun velocityAmountAboveOneBehavesLikeOne() {
+        var receivedMin = Int.MIN_VALUE
+        var receivedMax = Int.MIN_VALUE
+
+        calculateStp116FinalVelocity(
+            velocity = 100,
+            randomVelocityAmount = 1.5f,
+            randomIntProvider = { minInclusive, maxInclusive ->
+                receivedMin = minInclusive
+                receivedMax = maxInclusive
+                maxInclusive
+            },
+        )
+
+        assertEquals(1, receivedMin)
+        assertEquals(127, receivedMax)
     }
 
     @Test
@@ -166,6 +203,39 @@ class Stp116RuntimeModifiersTest {
     @Test
     fun delayTwentyGivesMaxGateThree() {
         assertEquals(3, maxStp116GateLengthForDelay(20))
+    }
+
+    @Test
+    fun gateLengthAmountBelowZeroBehavesLikeZero() {
+        assertEquals(
+            14L,
+            calculateStp116FinalGateLengthTicks(
+                gateLengthTicks = 14,
+                gateDelayTicks = 0,
+                randomGateLengthAmount = -0.25f,
+                randomIntProvider = { _, _ -> 3 },
+            ),
+        )
+    }
+
+    @Test
+    fun gateLengthAmountAboveOneBehavesLikeOne() {
+        var receivedMin = Int.MIN_VALUE
+        var receivedMax = Int.MIN_VALUE
+
+        calculateStp116FinalGateLengthTicks(
+            gateLengthTicks = 12,
+            gateDelayTicks = 0,
+            randomGateLengthAmount = 1.25f,
+            randomIntProvider = { minInclusive, maxInclusive ->
+                receivedMin = minInclusive
+                receivedMax = maxInclusive
+                maxInclusive
+            },
+        )
+
+        assertEquals(STP_116_MIN_GATE_LENGTH_TICKS, receivedMin)
+        assertEquals(maxStp116GateLengthForDelay(0), receivedMax)
     }
 
     @Test
